@@ -1,0 +1,17 @@
+{
+  "node": {
+    "002b15b3ebfb791cf70a7326ce5061711a39a654ed": {
+      "workers": {
+        "app/(customer)/checkout/page": {
+          "moduleId": 71329,
+          "async": false,
+          "exportedName": "logoutAction",
+          "filename": "apps/web/lib/actions/auth.ts"
+        }
+      },
+      "exportedName": "logoutAction",
+      "filename": "apps/web/lib/actions/auth.ts"
+    }
+  },
+  "edge": {}
+}

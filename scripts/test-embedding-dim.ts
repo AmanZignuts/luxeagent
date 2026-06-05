@@ -1,7 +1,7 @@
 import { loadEnvConfig } from '@next/env'
 loadEnvConfig(process.cwd())
 
-import { getEmbeddingModel } from '../lib/ai/llm'
+import { getEmbeddingModel } from '../apps/web/lib/ai/llm'
 import { embed } from 'ai'
 
 async function test() {

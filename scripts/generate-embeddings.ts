@@ -2,7 +2,7 @@ import { loadEnvConfig } from '@next/env'
 loadEnvConfig(process.cwd())
 
 import { createClient } from '@supabase/supabase-js'
-import { generateTextEmbedding, buildProductTextDocument, hashContent, fuseEmbeddings } from '../lib/ai/embeddings'
+import { generateTextEmbedding, buildProductTextDocument, hashContent, fuseEmbeddings } from '../apps/web/lib/ai/embeddings'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

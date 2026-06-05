@@ -1,0 +1,17 @@
+{
+  "node": {
+    "4044d15888ebc7b486a7c20ee4479522ff10a0f8f1": {
+      "workers": {
+        "app/(auth)/onboarding/style-persona/page": {
+          "moduleId": 89040,
+          "async": false,
+          "exportedName": "completeOnboardingAction",
+          "filename": "apps/web/lib/actions/auth.ts"
+        }
+      },
+      "exportedName": "completeOnboardingAction",
+      "filename": "apps/web/lib/actions/auth.ts"
+    }
+  },
+  "edge": {}
+}

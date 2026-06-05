@@ -1,0 +1,3 @@
+{
+  "/(customer)/pdp/[itemId]/page": "app/(customer)/pdp/[itemId]/page.js"
+}

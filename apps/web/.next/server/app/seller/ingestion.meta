@@ -1,0 +1,33 @@
+{
+  "status": 200,
+  "headers": {
+    "link": "</_next/static/media/2a65768255d6b625-s.p.3u4lli0-axodc.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\"",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/seller/layout,_N_T_/seller/ingestion/layout,_N_T_/seller/ingestion/page,_N_T_/seller/ingestion"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/seller/ingestion/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 160,
+                "slots": null
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

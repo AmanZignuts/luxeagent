@@ -1,0 +1,226 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/pdp/[itemId]",
+      "regex": "^/pdp/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPitemId": "nxtPitemId"
+      },
+      "namedRegex": "^/pdp/(?<nxtPitemId>[^/]+?)(?:/)?$",
+      "prefetchSegmentDataRoutes": [
+        {
+          "destination": "/pdp/[itemId].segments/!KGN1c3RvbWVyKQ/pdp/$d$itemId$segment",
+          "source": "^/pdp/(?<nxtPitemId>[^/]+?)\\.segments/!KGN1c3RvbWVyKQ/pdp/\\$d\\$itemId(?<segment>/__PAGE__\\.segment\\.rsc|\\.segment\\.rsc)(?:/)?$",
+          "routeKeys": {
+            "nxtPitemId": "nxtPitemId"
+          }
+        }
+      ]
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/admin/ingest",
+      "regex": "^/api/admin/ingest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/ingest(?:/)?$"
+    },
+    {
+      "page": "/api/chat",
+      "regex": "^/api/chat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/chat(?:/)?$"
+    },
+    {
+      "page": "/api/inventory",
+      "regex": "^/api/inventory(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/inventory(?:/)?$"
+    },
+    {
+      "page": "/api/orders",
+      "regex": "^/api/orders(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/orders(?:/)?$"
+    },
+    {
+      "page": "/api/outfit/swap",
+      "regex": "^/api/outfit/swap(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/outfit/swap(?:/)?$"
+    },
+    {
+      "page": "/checkout",
+      "regex": "^/checkout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/checkout(?:/)?$"
+    },
+    {
+      "page": "/concierge",
+      "regex": "^/concierge(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/concierge(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/landing",
+      "regex": "^/landing(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/landing(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/onboarding/merchant",
+      "regex": "^/onboarding/merchant(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/onboarding/merchant(?:/)?$"
+    },
+    {
+      "page": "/onboarding/style-persona",
+      "regex": "^/onboarding/style\\-persona(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/onboarding/style\\-persona(?:/)?$"
+    },
+    {
+      "page": "/orders",
+      "regex": "^/orders(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/orders(?:/)?$"
+    },
+    {
+      "page": "/orders/confirmation",
+      "regex": "^/orders/confirmation(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/orders/confirmation(?:/)?$"
+    },
+    {
+      "page": "/profile",
+      "regex": "^/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile(?:/)?$"
+    },
+    {
+      "page": "/register",
+      "regex": "^/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/register(?:/)?$"
+    },
+    {
+      "page": "/seller/dashboard",
+      "regex": "^/seller/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/seller/dashboard(?:/)?$"
+    },
+    {
+      "page": "/seller/ingestion",
+      "regex": "^/seller/ingestion(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/seller/ingestion(?:/)?$"
+    },
+    {
+      "page": "/seller/inventory",
+      "regex": "^/seller/inventory(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/seller/inventory(?:/)?$"
+    },
+    {
+      "page": "/seller/orders",
+      "regex": "^/seller/orders(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/seller/orders(?:/)?$"
+    },
+    {
+      "page": "/seller/settings",
+      "regex": "^/seller/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/seller/settings(?:/)?$"
+    },
+    {
+      "page": "/shop",
+      "regex": "^/shop(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/shop(?:/)?$"
+    },
+    {
+      "page": "/shop/catalog",
+      "regex": "^/shop/catalog(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/shop/catalog(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": true,
+    "dynamicRSCPrerender": true
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  },
+  "ppr": {
+    "chain": {
+      "headers": {
+        "next-resume": "1"
+      }
+    }
+  }
+}

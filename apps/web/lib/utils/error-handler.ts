@@ -56,6 +56,16 @@ export function getFriendlyErrorMessage(error: any): string {
  * Centralized API error logger and toast trigger
  */
 export function handleApiError(error: any, contextDescription?: string) {
+  const errorMsg = error?.message || (typeof error === "string" ? error : "");
+  const isRedirect =
+    errorMsg === "NEXT_REDIRECT" ||
+    errorMsg.includes("NEXT_REDIRECT") ||
+    (error && typeof error.digest === "string" && error.digest.startsWith("NEXT_REDIRECT"));
+
+  if (isRedirect) {
+    return null;
+  }
+
   const friendlyMessage = getFriendlyErrorMessage(error);
   
   // Structured error logging

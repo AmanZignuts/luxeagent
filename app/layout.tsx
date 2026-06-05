@@ -1,0 +1,39 @@
+import type { Metadata } from "next";
+import { Playfair_Display, Inter } from "next/font/google";
+import { Toaster } from "sonner";
+import "./globals.css";
+import { Agentation } from "agentation";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-serif",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+export const metadata: Metadata = {
+  title: "Vestira — Elite Fashion Concierge",
+  description: "Agentic AI styling suite, private multi-modal search, and automated boutique cataloging.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${inter.variable} ${playfair.variable} antialiased`}
+      >
+        {children}
+        <Toaster richColors position="top-right" closeButton />
+        {process.env.NODE_ENV === "development" && <Agentation />}
+      </body>
+    </html>
+  );
+}
+

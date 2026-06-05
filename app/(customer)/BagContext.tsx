@@ -1,0 +1,149 @@
+"use client";
+
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+export interface BagItem {
+  id: string;
+  sku: string;
+  title: string;
+  price: number;
+  size: string;
+  material: string;
+  category: string;
+  imageUrl?: string;
+  quantity?: number;
+}
+
+interface BagContextType {
+  bagItems: BagItem[];
+  addToBag: (item: BagItem) => void;
+  removeFromBag: (id: string, size: string) => void;
+  updateQuantity: (id: string, size: string, delta: number) => void;
+  clearBag: () => void;
+  isBagDrawerOpen: boolean;
+  setIsBagDrawerOpen: (open: boolean) => void;
+}
+
+const BagContext = createContext<BagContextType | undefined>(undefined);
+
+export function BagProvider({ children }: { children: React.ReactNode }) {
+  const [bagItems, setBagItems] = useState<BagItem[]>([]);
+  const [isBagDrawerOpen, setIsBagDrawerOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Subscribe to auth state changes to detect login/logout/registration
+  useEffect(() => {
+    const supabase = createClient();
+    
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // When userId changes, load the corresponding bag from localStorage
+  useEffect(() => {
+    setIsInitialized(false);
+    try {
+      const key = userId ? `vestira_bag_${userId}` : "vestira_bag_guest";
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        setBagItems(JSON.parse(stored));
+      } else {
+        setBagItems([]);
+      }
+    } catch (e) {
+      console.error("Failed to load bag from localStorage:", e);
+      setBagItems([]);
+    }
+    setIsInitialized(true);
+  }, [userId]);
+
+  // Persist state to localStorage upon any mutations
+  useEffect(() => {
+    if (!isInitialized) return;
+    try {
+      const key = userId ? `vestira_bag_${userId}` : "vestira_bag_guest";
+      localStorage.setItem(key, JSON.stringify(bagItems));
+    } catch (e) {
+      console.error("Failed to save bag to localStorage:", e);
+    }
+  }, [bagItems, userId, isInitialized]);
+
+  const addToBag = (item: BagItem) => {
+    setBagItems((prev) => {
+      // If an item with the same id and size already exists, increment its quantity
+      const existingIndex = prev.findIndex(
+        (existing) => existing.id === item.id && existing.size === item.size
+      );
+      if (existingIndex > -1) {
+        return prev.map((existing, index) =>
+          index === existingIndex
+            ? { ...existing, quantity: (Number(existing.quantity) || 1) + 1 }
+            : existing
+        );
+      }
+      // Otherwise add as a new entry with quantity 1
+      return [...prev, { ...item, quantity: 1 }];
+    });
+  };
+
+  const removeFromBag = (id: string, size: string) => {
+    setBagItems((prev) => prev.filter((item) => !(item.id === id && item.size === size)));
+  };
+
+  const updateQuantity = (id: string, size: string, delta: number) => {
+    setBagItems((prev) => {
+      return prev
+        .map((item) => {
+          if (item.id === id && item.size === size) {
+            const currentQty = Number(item.quantity) || 1;
+            const change = Number(delta);
+            const newQty = currentQty + change;
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        })
+        // Remove item if quantity drops to 0 or below
+        .filter((item) => (Number(item.quantity) || 1) > 0);
+    });
+  };
+
+  const clearBag = () => {
+    setBagItems([]);
+  };
+
+  return (
+    <BagContext.Provider
+      value={{
+        bagItems,
+        addToBag,
+        removeFromBag,
+        updateQuantity,
+        clearBag,
+        isBagDrawerOpen,
+        setIsBagDrawerOpen,
+      }}
+    >
+      {children}
+    </BagContext.Provider>
+  );
+}
+
+export function useBag() {
+  const context = useContext(BagContext);
+  if (context === undefined) {
+    throw new Error("useBag must be used within a BagProvider");
+  }
+  return context;
+}

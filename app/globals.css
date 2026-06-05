@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FAF0E6;
+  --foreground: #09090B;
+  --bg-warm-linen: #FAF0E6;
+  --fg-obsidian-velvet: #09090B;
+  --surface-white: #FFFFFF;
+  --tint-champagne: #F2EBD9;
+  --border-muted-zinc: #E4E4E7;
+}
+
+@theme {
+  --font-serif: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  
+  --color-warm-linen: var(--bg-warm-linen);
+  --color-obsidian-velvet: var(--fg-obsidian-velvet);
+  --color-surface-white: var(--surface-white);
+  --color-tint-champagne: var(--tint-champagne);
+  --color-muted-zinc: var(--border-muted-zinc);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+

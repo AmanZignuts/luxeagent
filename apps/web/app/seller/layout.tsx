@@ -13,6 +13,7 @@ export default function SellerLayout({
 }) {
   const pathname = usePathname();
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSignOutClick = (e: React.MouseEvent) => {
@@ -21,9 +22,15 @@ export default function SellerLayout({
   };
 
   const executeSignOut = async () => {
-    // Flush session cookies
-    toast.success("Successfully signed out. Hope to see you soon.");
-    await logoutAction();
+    try {
+      setIsSigningOut(true);
+      toast.success("Successfully signed out. Hope to see you soon.");
+      await logoutAction();
+    } finally {
+      // No need to set false usually if it redirects, but good practice
+      setIsSigningOut(false);
+      setShowSignOutModal(false);
+    }
   };
 
   const navLinks = [
@@ -213,17 +220,26 @@ export default function SellerLayout({
             <div className="flex gap-4 pt-2">
               <button
                 type="button"
+                disabled={isSigningOut}
                 onClick={() => setShowSignOutModal(false)}
-                className="flex-1 border border-muted-zinc hover:border-obsidian-velvet hover:bg-warm-linen/20 text-obsidian-velvet font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer"
+                className="flex-1 border border-muted-zinc hover:border-obsidian-velvet hover:bg-warm-linen/20 text-obsidian-velvet font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={isSigningOut}
                 onClick={executeSignOut}
-                className="flex-1 bg-obsidian-velvet hover:bg-obsidian-velvet/90 text-surface-white font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer"
+                className="flex-1 bg-obsidian-velvet hover:bg-obsidian-velvet/90 text-surface-white font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Sign Out
+                {isSigningOut ? (
+                  <>
+                    <div className="w-3.5 h-3.5 rounded-full border-[1.5px] border-surface-white/30 border-t-surface-white animate-spin" />
+                    <span>Signing Out...</span>
+                  </>
+                ) : (
+                  <span>Sign Out</span>
+                )}
               </button>
             </div>
           </div>

@@ -335,6 +335,7 @@ function IngestionForm() {
                   type="text"
                   disabled={isSaving}
                   error={!!errors.brandName}
+                  placeholder="Your brand name..."
                   {...register("brandName")}
                 />
               </FormField>
@@ -393,6 +394,7 @@ function IngestionForm() {
                   type="text"
                   disabled={isSaving}
                   error={!!errors.productName}
+                  placeholder='Your product name...'
                   {...register("productName")}
                 />
               </FormField>
@@ -442,6 +444,7 @@ function IngestionForm() {
                   disabled={isSaving}
                   error={!!errors.metaDescription}
                   className="resize-none"
+                  placeholder='your meta description...'
                   {...register("metaDescription")}
                 />
               </FormField>

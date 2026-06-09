@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 
@@ -124,7 +125,12 @@ const ProductCard = React.memo(({ product }: { product: Product }) => {
 });
 ProductCard.displayName = "ProductCard";
 
-export default function CatalogListingPage() {
+function CatalogListingContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const initialQ = searchParams.get("q") || "";
   const [products, setProducts] = useState<Product[]>([]);
   const [allDbProducts, setAllDbProducts] = useState<Product[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -138,7 +144,7 @@ export default function CatalogListingPage() {
   const [sizesList, setSizesList] = useState<string[]>(["XS", "S", "M", "L", "XL", "XXL", "ONE SIZE"]);
 
   // Active Filter States
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = searchParams.get("q") || "";
   const [inStockOnly, setInStockOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"featured" | "price-low" | "price-high">("featured");
 
@@ -146,7 +152,7 @@ export default function CatalogListingPage() {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
 
   // Autocomplete Search States
-  const [searchQueryInput, setSearchQueryInput] = useState("");
+  const [searchQueryInput, setSearchQueryInput] = useState(searchQuery);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<Product[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -303,13 +309,26 @@ export default function CatalogListingPage() {
     fetchFiltered();
   }, [searchQuery, selectedCategories, selectedSizes, inStockOnly, sortBy, initialLoading, isDbEmpty]);
 
-  // 3. Debounce search query updates
+  // 3. Debounce search query updates and sync with URL
   useEffect(() => {
     const handler = setTimeout(() => {
-      setSearchQuery(searchQueryInput);
+      if (searchQueryInput !== searchQuery) {
+        const params = new URLSearchParams(searchParams.toString());
+        if (searchQueryInput) {
+          params.set("q", searchQueryInput);
+        } else {
+          params.delete("q");
+        }
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      }
     }, 400);
     return () => clearTimeout(handler);
-  }, [searchQueryInput]);
+  }, [searchQueryInput, searchQuery, pathname, router, searchParams]);
+
+  // Sync external URL changes back to local input state
+  useEffect(() => {
+    setSearchQueryInput(searchQuery);
+  }, [searchQuery]);
 
   // 4. Client-side autocomplete suggestions
   useEffect(() => {
@@ -369,7 +388,6 @@ export default function CatalogListingPage() {
 
   const handleResetFilters = () => {
     setSearchQueryInput("");
-    setSearchQuery("");
     setInStockOnly(false);
     setSelectedCategories([]);
     setSelectedSizes([]);
@@ -378,6 +396,11 @@ export default function CatalogListingPage() {
     setPendingCategories([]);
     setPendingSizes([]);
     setPendingInStockOnly(false);
+    
+    // Also clear the URL query
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("q");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   // Fallback filtration for static catalog
@@ -777,5 +800,22 @@ export default function CatalogListingPage() {
       )}
 
     </div>
+  );
+}
+
+export default function CatalogListingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
+          <div className="w-8 h-8 rounded-full border-[1.5px] border-muted-zinc border-t-obsidian-velvet animate-spin" />
+          <span className="font-serif text-sm text-obsidian-velvet/40 tracking-wider uppercase">
+            Loading Catalog...
+          </span>
+        </div>
+      }
+    >
+      <CatalogListingContent />
+    </Suspense>
   );
 }

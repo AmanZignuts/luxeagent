@@ -66,8 +66,8 @@ export default function ProfileSettingsPage() {
     defaultValues: {
       fullName: "",
       email: "",
-      phone: "+1 (555) 234-8910",
-      address: "Apt 4B, 820 Park Avenue, New York, NY 10021",
+      phone: "",
+      address: "",
     },
   });
 
@@ -112,6 +112,12 @@ export default function ProfileSettingsPage() {
 
         // Populate personal details
         personalForm.setValue("email", user.email || "");
+        if (user.user_metadata?.phone) {
+          personalForm.setValue("phone", user.user_metadata.phone);
+        }
+        if (user.user_metadata?.address) {
+          personalForm.setValue("address", user.user_metadata.address);
+        }
 
         // Fetch style profile
         const { data: profile } = await supabase
@@ -158,6 +164,13 @@ export default function ProfileSettingsPage() {
         setIsUpdatingProfile(false);
         return;
       }
+
+      await supabase.auth.updateUser({
+        data: {
+          phone: values.phone,
+          address: values.address,
+        },
+      });
 
       const { error } = await supabase.from("user_style_profiles").upsert({
         user_id: user.id,

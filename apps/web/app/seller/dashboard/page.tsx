@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getMerchantOrders } from "@/lib/actions/orders";
@@ -43,7 +43,12 @@ export default function SellerDashboardPage() {
   const [chartLabels, setChartLabels] = useState<string[]>([]);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
 
+  const dataFetched = useRef(false);
+
   useEffect(() => {
+    if (dataFetched.current) return;
+    dataFetched.current = true;
+
     async function load() {
       try {
         const supabase = createClient();
@@ -224,6 +229,24 @@ export default function SellerDashboardPage() {
       dotText: "text-amber-600",
     },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-3xl mx-auto py-12 animate-in fade-in duration-300">
+        <div className="bg-surface-white border border-muted-zinc rounded-xl p-12 w-full flex flex-col items-center justify-center space-y-6 shadow-sm">
+          <div className="w-9 h-9 rounded-full border-[1.5px] border-muted-zinc border-t-obsidian-velvet animate-spin" />
+          <div className="text-center space-y-1.5">
+            <h3 className="font-serif text-lg font-light tracking-tight text-obsidian-velvet">
+              Loading Seller Dashboard
+            </h3>
+            <p className="font-sans text-[10px] text-obsidian-velvet/40 tracking-wider uppercase font-semibold">
+              Assembling revenue and fulfillment metrics
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 animate-in fade-in duration-300 w-full">

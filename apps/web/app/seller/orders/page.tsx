@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { getMerchantOrders, updateMerchantOrderStatus } from "@/lib/actions/orders";
 import { toast } from "sonner";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 
 interface MerchantOrder {
   id: string;
@@ -396,19 +398,20 @@ export default function SellerOrdersPage() {
                   >
                     {/* Order ID */}
                     <td className="px-6 py-5 text-left font-semibold text-obsidian-velvet/85 whitespace-nowrap w-36">
-                      <span className="block truncate max-w-[128px]" title={order.id}>{order.id}</span>
+                      <span className="block truncate max-w-[128px]" data-tooltip-id="table-tooltip" data-tooltip-content={order.id}>{order.id}</span>
                     </td>
 
                     {/* Client */}
                     <td className="px-6 py-5 text-left w-36">
-                      <span className="block truncate max-w-[128px] font-serif text-sm font-light" title={order.client}>{order.client}</span>
+                      <span className="block truncate max-w-[128px] font-serif text-sm font-light" data-tooltip-id="table-tooltip" data-tooltip-content={order.client}>{order.client}</span>
                     </td>
 
                     {/* Items */}
                     <td className="px-6 py-5 text-left w-56">
                       <span
                         className="block truncate max-w-[200px] text-obsidian-velvet/70"
-                        title={order.items}
+                        data-tooltip-id="table-tooltip"
+                        data-tooltip-content={order.items}
                       >
                         {order.items}
                       </span>
@@ -418,7 +421,8 @@ export default function SellerOrdersPage() {
                     <td className="px-6 py-5 text-left w-44">
                       <span
                         className="block truncate max-w-[160px] text-obsidian-velvet/60"
-                        title={order.courier}
+                        data-tooltip-id="table-tooltip"
+                        data-tooltip-content={order.courier}
                       >
                         {order.courier}
                       </span>
@@ -457,6 +461,7 @@ export default function SellerOrdersPage() {
           </table>
         </div>
       </div>
+      <Tooltip id="table-tooltip" className="z-50" style={{ maxWidth: '300px', whiteSpace: 'normal', borderRadius: '6px', fontSize: '12px' }} />
     </div>
   );
 }

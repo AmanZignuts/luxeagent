@@ -33,14 +33,24 @@ export function FormField({ label, error, optional, children, className = "" }: 
   );
 }
 
-export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { error?: boolean }>(
-  ({ className = "", error, ...props }, ref) => {
+export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { error?: boolean; allowDecimals?: boolean }>(
+  ({ className = "", error, onKeyDown, min, allowDecimals, ...props }, ref) => {
     return (
       <input
         ref={ref}
         className={`w-full bg-[#FAF0E6]/40 border ${
           error ? "border-red-400 focus:border-red-500" : "border-[#E4E4E7] focus:border-[#09090B]"
         } rounded-md px-4 py-3 text-sm font-sans text-[#09090B] placeholder:text-[#09090B]/30 focus:outline-none transition-colors duration-200 ${className}`}
+        onKeyDown={(e) => {
+          if (props.type === "number") {
+            const blockedKeys = allowDecimals ? ["e", "E", "+", "-"] : ["e", "E", "+", "-", "."];
+            if (blockedKeys.includes(e.key)) {
+              e.preventDefault();
+            }
+          }
+          if (onKeyDown) onKeyDown(e);
+        }}
+        min={props.type === "number" && min === undefined ? "0" : min}
         {...props}
       />
     );

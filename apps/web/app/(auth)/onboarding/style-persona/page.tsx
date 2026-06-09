@@ -24,6 +24,12 @@ function detectCardBrand(num: string): string {
 
 const onboardingSchema = yup.object().shape({
   fullName: yup.string().required("Full name is required."),
+  email: yup.string().email("Please enter a valid email format.").required("Email address is required."),
+  phone: yup
+    .string()
+    .required("Phone number is required.")
+    .matches(/^[+]?[0-9\s\-()]{7,18}$/, "Please enter a valid phone number."),
+  address: yup.string().required("Shipping address is required."),
   addPayment: yup.boolean().default(false),
   cardNumber: yup.string().when("addPayment", {
     is: true,
@@ -70,6 +76,10 @@ export default function ShopperSetupPage() {
   } = useForm<any>({
     resolver: yupResolver(onboardingSchema),
     defaultValues: {
+      fullName: "",
+      email: "",
+      phone: "",
+      address: "",
       addPayment: false,
       cardNumber: "",
       cardName: "",
@@ -89,6 +99,9 @@ export default function ShopperSetupPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      if (user.email) {
+        setValue("email", user.email);
+      }
       if (user.user_metadata?.full_name) {
         setValue("fullName", user.user_metadata.full_name);
       }
@@ -154,6 +167,8 @@ export default function ShopperSetupPage() {
       // Update style profile + mark onboarding complete
       const formData = new FormData();
       formData.append("displayName", values.fullName.trim());
+      formData.append("phone", values.phone || "");
+      formData.append("address", values.address || "");
       formData.append("preferredSize", "M");
       formData.append("budgetMin", "100");
       formData.append("budgetMax", "2000");
@@ -234,6 +249,34 @@ export default function ShopperSetupPage() {
                   error={!!errors.fullName}
                   placeholder="Jean Lauren"
                   {...register("fullName")}
+                />
+              </FormField>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="Email Address" error={errors.email?.message}>
+                  <Input
+                    type="email"
+                    disabled={true}
+                    error={!!errors.email}
+                    {...register("email")}
+                  />
+                </FormField>
+                <FormField label="Phone Number" error={errors.phone?.message}>
+                  <Input
+                    type="text"
+                    disabled={isSubmitting}
+                    error={!!errors.phone}
+                    {...register("phone")}
+                  />
+                </FormField>
+              </div>
+
+              <FormField label="Default Shipping Address" error={errors.address?.message}>
+                <Input
+                  type="text"
+                  disabled={isSubmitting}
+                  error={!!errors.address}
+                  {...register("address")}
                 />
               </FormField>
             </div>

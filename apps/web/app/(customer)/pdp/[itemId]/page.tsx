@@ -223,17 +223,17 @@ export default function ProductDetailPage({
     <div className="space-y-8">
       {/* Return link */}
       <div>
-        <Link
-          href="/shop/catalog"
-          className="font-sans text-[10px] tracking-widest uppercase text-obsidian-velvet/40 hover:text-obsidian-velvet transition-colors inline-flex items-center gap-1.5"
+        <button
+          onClick={() => router.back()}
+          className="font-sans text-[10px] tracking-widest uppercase text-obsidian-velvet/40 hover:text-obsidian-velvet transition-colors inline-flex items-center gap-1.5 cursor-pointer"
         >
-          ← Return to Catalog
-        </Link>
+          ← Go Back
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Left Column: Product Detail Presentation */}
-        <div className="lg:col-span-5 space-y-8">
+        <div className="order-2 lg:order-1 lg:col-span-5 space-y-8">
           <div className="border-b border-muted-zinc/60 pb-6">
             <span className="font-sans text-[10px] tracking-widest uppercase text-obsidian-velvet/40 block mb-2">
               {product.category} — {product.sku}
@@ -369,7 +369,7 @@ export default function ProductDetailPage({
         </div>
 
         {/* Right Column: Dynamic Image Box */}
-        <div className="lg:col-span-7 flex flex-col justify-between bg-surface-white border border-muted-zinc rounded-xl p-8 h-[520px] lg:h-[680px] relative overflow-hidden shadow-none">
+        <div className="order-1 lg:order-2 lg:col-span-7 flex flex-col justify-between bg-surface-white border border-muted-zinc rounded-xl p-8 h-[520px] lg:h-[680px] relative overflow-hidden shadow-none">
           {/* Subtle atmospheric linen shading in background */}
           <div className="absolute inset-0 bg-gradient-to-tr from-[#FAF0E6]/10 to-[#09090B]/5 opacity-60 z-0 pointer-events-none" />
 

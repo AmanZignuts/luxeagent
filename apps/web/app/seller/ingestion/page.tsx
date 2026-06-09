@@ -16,7 +16,6 @@ const ingestionSchema = yup.object().shape({
   sku: yup.string().notRequired(),
   brandName: yup.string().required("Brand name is required."),
   category: yup.string().required("Category is required."),
-  gender: yup.string().required("Gender tag is required."),
   price: yup
     .number()
     .typeError("Price must be a number.")
@@ -24,15 +23,16 @@ const ingestionSchema = yup.object().shape({
     .required("Price is required."),
   productName: yup.string().required("Product name is required."),
   description: yup.string().required("Description is required."),
-  parentCategory: yup.string().required("Parent category selection is required."),
   pageTitle: yup.string().required("SEO page title is required."),
   metaDescription: yup.string().required("SEO meta description is required."),
   stock: yup
     .number()
+    .transform((value, originalValue) => (String(originalValue).trim() === "" ? null : value))
+    .nullable()
     .typeError("Stock units must be a number.")
     .integer("Stock must be an integer.")
     .min(0, "Stock cannot be negative.")
-    .default(10),
+    .required("Stock is required."),
   material: yup.string().required("Material details are required."),
 });
 
@@ -46,7 +46,13 @@ function IngestionForm() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [categoriesList, setCategoriesList] = useState<string[]>([
+    "Ready-to-Wear", "Couture", "Evening Wear", "Dresses", "Tops", "Outerwear", "Trousers", "Accessories"
+  ]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const categoriesFetched = useRef(false);
+  const productFetchedId = useRef<string | null>(null);
+  const [isLoading, setIsLoading] = useState(!!editId);
 
   const {
     register,
@@ -59,21 +65,52 @@ function IngestionForm() {
       sku: "",
       brandName: "",
       category: "",
-      gender: "",
       price: "",
       productName: "",
       description: "",
-      parentCategory: "",
       pageTitle: "",
       metaDescription: "",
-      stock: 10,
+      stock: "" as any,
       material: "",
     },
   });
 
+  // Load distinct categories list dynamically from DB products
+  useEffect(() => {
+    if (categoriesFetched.current) return;
+    categoriesFetched.current = true;
+
+    async function loadUniqueCategories() {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("products")
+          .select("category");
+
+        if (data) {
+          const unique = Array.from(
+            new Set(data.map((p) => p.category))
+          ).filter(Boolean) as string[];
+
+          const merged = Array.from(new Set([
+            "Ready-to-Wear", "Couture", "Evening Wear", "Dresses", "Tops", "Outerwear", "Trousers", "Accessories", ...unique
+          ]));
+          setCategoriesList(merged);
+        }
+      } catch (e) {
+        console.error("Failed to load unique categories from DB", e);
+      }
+    }
+    loadUniqueCategories();
+  }, []);
+
   // Load product if in edit mode
   useEffect(() => {
     if (editId) {
+      if (productFetchedId.current === editId) return;
+      productFetchedId.current = editId;
+      setIsLoading(true);
+
       async function fetchProduct() {
         try {
           const supabase = createClient();
@@ -88,23 +125,41 @@ function IngestionForm() {
               sku: data.sku || "",
               brandName: data.brand || "",
               category: data.category || "Ready-to-Wear",
-              gender: data.gender || "Unisex",
               price: data.price || 0,
               productName: data.title || "",
               description: data.description || "",
-              parentCategory: data.category || "",
               pageTitle: data.title || "",
               metaDescription: data.description || "",
-              stock: data.stock_by_size ? Object.values(data.stock_by_size).reduce((a: any, b: any) => Number(a) + Number(b), 0) as number : 10,
+              stock: data.stock_by_size ? Object.values(data.stock_by_size).reduce((a: any, b: any) => Number(a) + Number(b), 0) as number : "" as any,
               material: data.material_composition || "",
             });
             setImageUrl(data.image_urls && data.image_urls.length > 0 ? data.image_urls[0] : null);
           }
         } catch (e) {
           console.error("Failed to load product for editing", e);
+        } finally {
+          setIsLoading(false);
         }
       }
       fetchProduct();
+    } else {
+      if (productFetchedId.current === null) return;
+      productFetchedId.current = null;
+      setIsLoading(false);
+      reset({
+        sku: "",
+        brandName: "",
+        category: "",
+        price: "",
+        productName: "",
+        description: "",
+        pageTitle: "",
+        metaDescription: "",
+        stock: "" as any,
+        material: "",
+      });
+      setImageUrl(null);
+      setUploadFile(null);
     }
   }, [editId, reset]);
 
@@ -134,7 +189,6 @@ function IngestionForm() {
             description: values.description,
             category: values.category,
             brand: values.brandName,
-            gender: values.gender || "unisex",
             material_composition: values.material,
             image_urls: imageUrl ? [imageUrl] : [],
             stock_by_size: { M: Number(values.stock || 10) }
@@ -146,6 +200,7 @@ function IngestionForm() {
         }
 
         toast.success("Product changes saved successfully to database.");
+        setIsSaving(false);
         router.push("/seller/inventory");
         return;
       }
@@ -154,7 +209,7 @@ function IngestionForm() {
       formData.append("title", values.productName);
       formData.append("price", String(values.price));
       formData.append("sku", values.sku || `LA-CST-${Math.floor(Math.random() * 10000)}`);
-      
+
       if (uploadFile) {
         formData.append("images", uploadFile);
       }
@@ -169,13 +224,25 @@ function IngestionForm() {
         throw new Error(data.error || "Ingestion pipeline failed");
       }
 
-      toast.success("Product successfully processed and published to catalog!");
+      toast.success("Product successfully added to inventory!");
+      setIsSaving(false);
       router.push("/seller/inventory");
     } catch (err: any) {
       handleApiError(err, "Product Vision Ingestion");
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-300 w-full max-w-7xl mx-auto pb-12 pt-24 flex flex-col items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-[2px] border-muted-zinc border-t-obsidian-velvet animate-spin mb-4" />
+        <span className="font-sans text-xs text-obsidian-velvet/60 tracking-widest uppercase font-semibold">
+          Loading Product Details...
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 w-full max-w-7xl mx-auto pb-12">
@@ -203,12 +270,12 @@ function IngestionForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
+
         {/* LEFT COLUMN: Image Upload & Parent Category */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-surface-white border border-muted-zinc rounded-xl p-6 shadow-sm">
             <h2 className="font-sans text-base font-bold text-obsidian-velvet mb-4">Product Image</h2>
-            
+
             {/* Drop zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -232,7 +299,7 @@ function IngestionForm() {
                 }}
                 className="hidden"
               />
-              
+
               {imageUrl ? (
                 <>
                   <img src={imageUrl} alt="Product" className="w-full h-full object-cover" />
@@ -253,42 +320,25 @@ function IngestionForm() {
               )}
             </div>
           </div>
-
-          <div className="bg-surface-white border border-muted-zinc rounded-xl p-6 shadow-sm space-y-4 relative overflow-hidden">
-            <h2 className="font-sans text-base font-bold text-obsidian-velvet border-b border-muted-zinc/60 pb-3">Parent Category</h2>
-            <FormField error={errors.parentCategory?.message}>
-              <Select
-                disabled={isSaving}
-                error={!!errors.parentCategory}
-                {...register("parentCategory")}
-              >
-                <option value="">Select a parent category...</option>
-                <option value="Apparel">Apparel</option>
-                <option value="Accessories">Accessories</option>
-                <option value="Footwear">Footwear</option>
-              </Select>
-            </FormField>
-            <p className="font-sans text-[10px] text-obsidian-velvet/40 pt-1 leading-relaxed">Select a category that will be the parent of the current one.</p>
-          </div>
         </div>
 
         {/* RIGHT COLUMN: Form Fields */}
         <div className="lg:col-span-8 space-y-6">
-          
+
           {/* Basic Information */}
           <div className="bg-surface-white border border-muted-zinc rounded-xl p-8 shadow-sm space-y-6 relative overflow-hidden">
             <h2 className="font-sans text-base font-bold text-obsidian-velvet border-b border-muted-zinc/60 pb-3">Basic Information</h2>
-            
-            <FormField label="Brand Name" error={errors.brandName?.message}>
-              <Input
-                type="text"
-                disabled={isSaving}
-                error={!!errors.brandName}
-                {...register("brandName")}
-              />
-            </FormField>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField label="Brand Name" error={errors.brandName?.message}>
+                <Input
+                  type="text"
+                  disabled={isSaving}
+                  error={!!errors.brandName}
+                  {...register("brandName")}
+                />
+              </FormField>
+
               <FormField label="Category" error={errors.category?.message}>
                 <Select
                   disabled={isSaving}
@@ -296,26 +346,12 @@ function IngestionForm() {
                   {...register("category")}
                 >
                   <option value="">Select...</option>
-                  <option value="Ready-to-Wear">Ready-to-Wear</option>
-                  <option value="Couture">Couture</option>
-                  <option value="Evening Wear">Evening Wear</option>
+                  {categoriesList.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </Select>
               </FormField>
-              <FormField label="Gender" error={errors.gender?.message}>
-                <Select
-                  disabled={isSaving}
-                  error={!!errors.gender}
-                  {...register("gender")}
-                >
-                  <option value="">Select...</option>
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
-                  <option value="Unisex">Unisex</option>
-                </Select>
-              </FormField>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <FormField label="Price (USD)" error={errors.price?.message}>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-sans text-sm text-obsidian-velvet/40">$</span>
@@ -325,10 +361,13 @@ function IngestionForm() {
                     error={!!errors.price}
                     placeholder="0.00"
                     className="pl-7"
+                    allowDecimals={true}
+                    step="0.01"
                     {...register("price")}
                   />
                 </div>
               </FormField>
+
               <FormField label="Stock Units" error={errors.stock?.message}>
                 <Input
                   type="number"
@@ -338,26 +377,26 @@ function IngestionForm() {
                   {...register("stock")}
                 />
               </FormField>
+
+              <FormField label="Material" error={errors.material?.message}>
+                <Input
+                  type="text"
+                  disabled={isSaving}
+                  error={!!errors.material}
+                  placeholder="e.g. 100% Wool, Linen"
+                  {...register("material")}
+                />
+              </FormField>
+
+              <FormField label="Product Name" error={errors.productName?.message}>
+                <Input
+                  type="text"
+                  disabled={isSaving}
+                  error={!!errors.productName}
+                  {...register("productName")}
+                />
+              </FormField>
             </div>
-
-            <FormField label="Material" error={errors.material?.message}>
-              <Input
-                type="text"
-                disabled={isSaving}
-                error={!!errors.material}
-                placeholder="e.g. 100% Wool, Linen"
-                {...register("material")}
-              />
-            </FormField>
-
-            <FormField label="Product Name" error={errors.productName?.message}>
-              <Input
-                type="text"
-                disabled={isSaving}
-                error={!!errors.productName}
-                {...register("productName")}
-              />
-            </FormField>
 
             <FormField label="Description" error={errors.description?.message}>
               <div className="border border-muted-zinc rounded-md overflow-hidden bg-warm-linen/20">
@@ -385,8 +424,8 @@ function IngestionForm() {
           {/* Meta Info */}
           <div className="bg-surface-white border border-muted-zinc rounded-xl p-8 shadow-sm space-y-6 relative overflow-hidden">
             <h2 className="font-sans text-base font-bold text-obsidian-velvet border-b border-muted-zinc/60 pb-3">Meta Information</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+
+            <div className="grid grid-cols-1 gap-6 pt-2">
               <FormField label="Page Title" error={errors.pageTitle?.message}>
                 <Input
                   type="text"

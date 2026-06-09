@@ -4,6 +4,11 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 
 interface SkuRecord {
   id?: string;
@@ -15,7 +20,18 @@ interface SkuRecord {
   sourcing: string;
   material: string;
   status: "ACTIVE" | "PENDING" | "OUT_OF_STOCK";
+  imageUrl?: string;
 }
+
+const FALLBACK_IMAGES = [
+  "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1594938298299-1f4967a50fc4?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1550614000-4b95dd2449bb?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1618932260643-eee4a2f652a6?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?w=200&h=200&fit=crop",
+  "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&h=200&fit=crop"
+];
 
 const STATIC_CATALOG: SkuRecord[] = [
   {
@@ -27,7 +43,8 @@ const STATIC_CATALOG: SkuRecord[] = [
     price: 380,
     sourcing: "Florence, Italy",
     material: "70% Organic Linen, 30% Fine Cotton",
-    status: "ACTIVE"
+    status: "ACTIVE",
+    imageUrl: "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop"
   },
   {
     id: "static-2",
@@ -38,7 +55,8 @@ const STATIC_CATALOG: SkuRecord[] = [
     price: 450,
     sourcing: "Biella, Italy",
     material: "100% Super-120s Virgin Wool",
-    status: "ACTIVE"
+    status: "ACTIVE",
+    imageUrl: "https://images.unsplash.com/photo-1594938298299-1f4967a50fc4?w=200&h=200&fit=crop"
   },
   {
     id: "static-3",
@@ -49,7 +67,8 @@ const STATIC_CATALOG: SkuRecord[] = [
     price: 680,
     sourcing: "Florence, Italy",
     material: "100% Mulberry Silk Crepe",
-    status: "ACTIVE"
+    status: "ACTIVE",
+    imageUrl: "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop"
   },
   {
     id: "static-4",
@@ -60,7 +79,8 @@ const STATIC_CATALOG: SkuRecord[] = [
     price: 950,
     sourcing: "Biella, Italy",
     material: "100% Recycled Cashmere Wool Blend",
-    status: "OUT_OF_STOCK"
+    status: "OUT_OF_STOCK",
+    imageUrl: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200&h=200&fit=crop"
   },
   {
     id: "static-5",
@@ -71,7 +91,8 @@ const STATIC_CATALOG: SkuRecord[] = [
     price: 490,
     sourcing: "Florence, Italy",
     material: "100% Organic Silk Georgette",
-    status: "ACTIVE"
+    status: "ACTIVE",
+    imageUrl: "https://images.unsplash.com/photo-1550614000-4b95dd2449bb?w=200&h=200&fit=crop"
   }
 ];
 
@@ -86,11 +107,19 @@ export default function InventoryLedgerPage() {
 
   const [catalog, setCatalog] = useState<SkuRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
+  // Deletion Modal State
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Server-side Pagination States
   const [currentPage, setCurrentPage] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 8;
+
+  // Refs for deduplicating API calls in React StrictMode
+  const categoriesFetched = React.useRef(false);
+  const lastFetchKey = React.useRef("");
 
   // Search Debouncer Effect
   useEffect(() => {
@@ -103,18 +132,21 @@ export default function InventoryLedgerPage() {
 
   // Load distinct categories list dynamically from DB products
   useEffect(() => {
+    if (categoriesFetched.current) return;
+    categoriesFetched.current = true;
+
     async function loadUniqueCategories() {
       try {
         const supabase = createClient();
         const { data } = await supabase
           .from("products")
           .select("category");
-          
+
         if (data) {
           const unique = Array.from(
             new Set(data.map((p) => (p.category || "Ready-to-Wear").toUpperCase()))
           ).filter(Boolean);
-          
+
           // Merge default set with database categories to preserve premium defaults
           const merged = Array.from(new Set(["ALL", ...unique, "DRESSES", "TOPS", "OUTERWEAR", "TROUSERS", "ACCESSORIES"]));
           setCategoriesList(merged);
@@ -128,11 +160,15 @@ export default function InventoryLedgerPage() {
 
   // Fetch catalog with active filters and pagination from Supabase server
   const fetchCatalog = async () => {
+    const fetchKey = `${debouncedSearch}-${selectedCategory}-${currentPage}`;
+    if (lastFetchKey.current === fetchKey) return;
+    lastFetchKey.current = fetchKey;
+
     setLoading(true);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       let query = supabase
         .from("products")
         .select("*", { count: "exact" });
@@ -172,7 +208,10 @@ export default function InventoryLedgerPage() {
           price: Number(p.price) || 0,
           sourcing: p.material_composition || "Premium Sourced",
           material: p.material_composition || "Selected Blend",
-          status: "ACTIVE"
+          status: "ACTIVE",
+          imageUrl: p.image_urls && p.image_urls.length > 0
+            ? p.image_urls[0]
+            : FALLBACK_IMAGES[Math.abs((p.sku || p.id || "").split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % FALLBACK_IMAGES.length]
         }));
       } else {
         // Fallback to static catalog only on page 0 if database is completely empty
@@ -193,6 +232,40 @@ export default function InventoryLedgerPage() {
   useEffect(() => {
     fetchCatalog();
   }, [debouncedSearch, selectedCategory, currentPage]);
+
+  const handleDelete = (id?: string) => {
+    if (!id) return;
+    if (id.startsWith("static-")) {
+      toast.error("Cannot delete static placeholder items.");
+      return;
+    }
+    setProductToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!productToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      const res = await fetch(`/api/admin/delete?id=${productToDelete}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Failed to delete product from server");
+      }
+
+      toast.success("Product deleted successfully");
+      setProductToDelete(null);
+      fetchCatalog(); // Refresh the list
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete product");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const getStatusBadge = (status: SkuRecord["status"]) => {
     switch (status) {
@@ -282,14 +355,28 @@ export default function InventoryLedgerPage() {
               key={item.sku}
               className="bg-surface-white border border-muted-zinc rounded-xl p-5 space-y-4"
             >
-              {/* Top row: SKU + status */}
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-sans text-[10px] font-bold text-obsidian-velvet/50 tracking-widest uppercase">
-                  {item.sku}
-                </span>
-                <span className={`border px-2 py-0.5 rounded-sm text-[8px] font-bold uppercase tracking-wider flex-shrink-0 ${getStatusBadge(item.status)}`}>
-                  {item.status.replace(/_/g, " ")}
-                </span>
+              {/* Top row: Image + SKU + status */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-muted-zinc/20 border border-muted-zinc/40">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.imageUrl || "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop"}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop";
+                    }}
+                  />
+                </div>
+
+                <div className="flex-1 flex items-center justify-between gap-2">
+                  <span className="font-sans text-[10px] font-bold text-obsidian-velvet/50 tracking-widest uppercase">
+                    {item.sku}
+                  </span>
+                  <span className={`border px-2 py-0.5 rounded-sm text-[8px] font-bold uppercase tracking-wider flex-shrink-0 ${getStatusBadge(item.status)}`}>
+                    {item.status.replace(/_/g, " ")}
+                  </span>
+                </div>
               </div>
 
               {/* Title + category */}
@@ -312,7 +399,13 @@ export default function InventoryLedgerPage() {
                     {item.stock} units
                   </span>
                 </div>
-                <div className="flex items-end justify-end">
+                <div className="flex items-end justify-end gap-2">
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="border border-red-200 bg-red-50 px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wider text-red-700 hover:bg-red-700 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Delete
+                  </button>
                   <button
                     onClick={() => router.push(`/seller/ingestion?id=${item.id || item.sku}`)}
                     className="border border-muted-zinc bg-surface-white px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wider text-obsidian-velvet hover:bg-obsidian-velvet hover:text-surface-white transition-colors cursor-pointer"
@@ -360,67 +453,101 @@ export default function InventoryLedgerPage() {
           <table className="w-full text-left border-collapse font-sans text-xs">
             <thead>
               <tr className="bg-zinc-50 border-b border-muted-zinc font-semibold text-obsidian-velvet/50 uppercase tracking-widest text-[9px]">
-                <th className="px-6 py-4 text-left whitespace-nowrap">SKU / Code</th>
-                <th className="px-6 py-4 text-left whitespace-nowrap">Garment Title</th>
-                <th className="px-6 py-4 text-left whitespace-nowrap">Category</th>
-                <th className="px-6 py-4 text-left whitespace-nowrap">Sourcing</th>
-                <th className="px-6 py-4 text-right whitespace-nowrap">Price</th>
-                <th className="px-6 py-4 text-right whitespace-nowrap">Stock</th>
-                <th className="px-6 py-4 text-center whitespace-nowrap">Status</th>
-                <th className="px-6 py-4 text-center whitespace-nowrap">Actions</th>
+                <th className="px-3 py-4 text-left whitespace-nowrap w-12">Preview</th>
+                <th className="px-3 py-4 text-left whitespace-nowrap">SKU / Code</th>
+                <th className="px-3 py-4 text-left whitespace-nowrap">Garment Title</th>
+                <th className="px-3 py-4 text-left whitespace-nowrap">Category</th>
+                <th className="px-3 py-4 text-left whitespace-nowrap">Sourcing</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap">Price</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap">Stock</th>
+                <th className="px-3 py-4 text-center whitespace-nowrap">Status</th>
+                <th className="px-3 py-4 text-center whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted-zinc/60 text-obsidian-velvet">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-3 py-16 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="w-6 h-6 rounded-full border-[1.5px] border-muted-zinc border-t-obsidian-velvet animate-spin" />
                       <span className="font-sans text-[10px] text-obsidian-velvet/40 tracking-wider uppercase font-semibold">
-                        Querying Products...
+                        Loading products...
                       </span>
                     </div>
                   </td>
                 </tr>
               ) : catalog.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-obsidian-velvet/40">
-                    No active SKU records match your query filters.
+                  <td colSpan={9} className="px-3 py-12 text-center text-obsidian-velvet/40">
+                    No products found.
                   </td>
                 </tr>
               ) : (
                 catalog.map((item) => (
                   <tr key={item.sku} className="hover:bg-warm-linen/10 transition-colors">
-                    <td className="px-6 py-4 text-left font-semibold text-obsidian-velvet/85 whitespace-nowrap">{item.sku}</td>
-                    <td className="px-6 py-4 text-left">
-                      <span className="block truncate max-w-[180px] font-serif text-sm font-light" title={item.title}>{item.title}</span>
+                    <td className="px-3 py-4 text-left">
+                      <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-muted-zinc/20 border border-muted-zinc/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.imageUrl || "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop"}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=200&h=200&fit=crop";
+                          }}
+                        />
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-left whitespace-nowrap">
+                    <td className="px-3 py-4 text-left font-semibold text-obsidian-velvet/85 whitespace-nowrap">{item.sku}</td>
+                    <td className="px-3 py-4 text-left">
+                      <span
+                        className="block truncate max-w-[180px] font-serif text-sm font-light"
+                        data-tooltip-id="table-tooltip"
+                        data-tooltip-content={item.title}
+                      >
+                        {item.title}
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 text-left whitespace-nowrap">
                       <span className="bg-warm-linen border border-muted-zinc/60 px-1.5 py-0.5 rounded-sm text-[8px] font-bold text-obsidian-velvet/60 uppercase">
                         {item.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-left">
-                      <span className="block truncate max-w-[140px] text-obsidian-velvet/60" title={item.sourcing}>{item.sourcing}</span>
+                    <td className="px-3 py-4 text-left">
+                      <span
+                        className="block truncate max-w-[140px] text-obsidian-velvet/60"
+                        data-tooltip-id="table-tooltip"
+                        data-tooltip-content={item.sourcing}
+                      >
+                        {item.sourcing}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-semibold whitespace-nowrap">${item.price.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-right font-semibold whitespace-nowrap">
+                    <td className="px-3 py-4 text-right font-semibold whitespace-nowrap">${item.price.toFixed(2)}</td>
+                    <td className="px-3 py-4 text-right font-semibold whitespace-nowrap">
                       <span className={item.stock === 0 ? "text-red-500 font-bold" : "text-obsidian-velvet"}>
                         {item.stock} units
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                    <td className="px-3 py-4 text-center whitespace-nowrap">
                       <span className={`border px-2 py-0.5 rounded-sm text-[8px] font-bold uppercase tracking-wider ${getStatusBadge(item.status)}`}>
                         {item.status.replace(/_/g, " ")}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => router.push(`/seller/ingestion?id=${item.id || item.sku}`)}
-                        className="border border-muted-zinc bg-surface-white px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider text-obsidian-velvet hover:bg-obsidian-velvet hover:text-surface-white hover:border-obsidian-velvet transition-colors cursor-pointer"
-                      >
-                        Edit
-                      </button>
+                    <td className="px-3 py-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => router.push(`/seller/ingestion?id=${item.id || item.sku}`)}
+                          className="border border-muted-zinc bg-surface-white px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider text-obsidian-velvet hover:bg-obsidian-velvet hover:text-surface-white hover:border-obsidian-velvet transition-colors cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="border border-red-200 bg-red-50 px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider text-red-700 hover:bg-red-700 hover:text-white hover:border-red-700 transition-colors cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -428,6 +555,8 @@ export default function InventoryLedgerPage() {
             </tbody>
           </table>
         </div>
+
+        <Tooltip id="table-tooltip" className="z-50" style={{ maxWidth: '300px', whiteSpace: 'normal', borderRadius: '6px', fontSize: '12px' }} />
 
         {/* Desktop Pagination */}
         {!loading && totalItems > 0 && (
@@ -463,6 +592,38 @@ export default function InventoryLedgerPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!productToDelete}
+        onClose={() => setProductToDelete(null)}
+        title="Delete Product"
+        size="sm"
+      >
+        <div className="space-y-6">
+          <p className="font-sans text-sm text-obsidian-velvet/80">
+            Are you sure you want to permanently delete this product? This action cannot be undone and it will be removed from the catalog immediately.
+          </p>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              onClick={() => setProductToDelete(null)}
+              disabled={isDeleting}
+              className="border border-muted-zinc bg-surface-white px-4 py-2 rounded-md font-sans text-[10px] font-bold uppercase tracking-wider text-obsidian-velvet hover:bg-muted-zinc/20 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <Button
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              loading={isDeleting}
+              variant="danger"
+              className="px-4 py-2 text-[10px] bg-red-600 text-white hover:bg-red-700 border-red-600"
+            >
+              Confirm Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

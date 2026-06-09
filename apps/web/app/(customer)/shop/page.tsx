@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 
@@ -61,9 +62,20 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
 };
 
+const RECOMMENDATION_TEXTS = [
+  "pairs seamlessly with your registered Minimalist Tailoring style profile.",
+  "complements your recent purchases and elevates your evening wardrobe.",
+  "is a perfect match for your refined, modern aesthetic preferences.",
+  "adds a touch of effortless elegance to your seasonal capsule collection.",
+  "aligns perfectly with your preference for structured, natural fibers."
+];
+
 export default function ShopFeedPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recommendedIndex, setRecommendedIndex] = useState(0);
+  const [recommendationTextIndex, setRecommendationTextIndex] = useState(0);
 
   useEffect(() => {
     async function loadProducts() {
@@ -90,16 +102,22 @@ export default function ShopFeedPage() {
           }));
 
           const merged = [...dbMapped];
-          for (let i = merged.length; i < 3; i++) {
+          for (let i = merged.length; i < 4; i++) {
             merged.push(STATIC_PRODUCTS[i % STATIC_PRODUCTS.length]);
           }
           setProducts(merged);
+          setRecommendedIndex(Math.floor(Math.random() * merged.length));
+          setRecommendationTextIndex(Math.floor(Math.random() * RECOMMENDATION_TEXTS.length));
         } else {
           setProducts(STATIC_PRODUCTS);
+          setRecommendedIndex(Math.floor(Math.random() * STATIC_PRODUCTS.length));
+          setRecommendationTextIndex(Math.floor(Math.random() * RECOMMENDATION_TEXTS.length));
         }
       } catch (err) {
         console.error("Failed to load featured products:", err);
         setProducts(STATIC_PRODUCTS);
+        setRecommendedIndex(Math.floor(Math.random() * STATIC_PRODUCTS.length));
+        setRecommendationTextIndex(Math.floor(Math.random() * RECOMMENDATION_TEXTS.length));
       } finally {
         setLoading(false);
       }
@@ -152,59 +170,68 @@ export default function ShopFeedPage() {
         <motion.div
           variants={itemVariants}
           whileHover={{ scale: 1.005 }}
+          onClick={() => {
+            if (products[0]?.id) {
+              router.push(`/pdp/${products[0].id}`);
+            }
+          }}
           className="relative md:col-span-2 h-[420px] rounded-xl overflow-hidden border border-muted-zinc bg-[#D4C9BC] flex items-center justify-center group cursor-pointer"
         >
-          <img
-            alt="Resort Linen Couture Campaign"
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-103"
-            src="/resort_spotlight.png"
-          />
+          {products[0]?.imageUrl && (
+            <img
+              alt={products[0]?.title}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-103"
+              src={products[0]?.imageUrl}
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent opacity-85 z-10 pointer-events-none" />
 
           {/* Floating Branding Identifier */}
           <div className="absolute top-8 left-8 z-20 text-white drop-shadow-sm">
-            <span className="font-sans text-[10px] tracking-widest uppercase font-semibold opacity-70 block mb-1">Lookbook Capsule</span>
-            <span className="font-serif text-lg tracking-normal">Atelier N° 3</span>
+            <span className="font-sans text-[10px] tracking-widest uppercase font-semibold opacity-70 block mb-1">Featured Product</span>
+            <span className="font-serif text-lg tracking-normal">{products[0]?.title}</span>
           </div>
 
           {/* Bottom-Left Translucent Label Tag */}
           <div className="absolute bottom-8 left-8 z-20">
             <div className="bg-surface-white/95 border border-muted-zinc backdrop-blur-sm px-4 py-2.5 rounded-sm text-xs font-sans font-semibold tracking-widest text-obsidian-velvet uppercase">
-              ATELIER N° 3 — RESORT LINEN COUTURE
+              {products[0]?.category} — {products[0]?.material}
             </div>
           </div>
         </motion.div>
 
-        {/* Bento Card 2: Standard Catalog Card (Linen Blend Overshirt) */}
+        {/* Bento Card 2: Standard Catalog Card (Product 1) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
           className="block bg-surface-white border border-muted-zinc rounded-xl p-6 flex flex-col justify-between aspect-square md:aspect-auto md:h-[420px] shadow-none hover:border-obsidian-velvet transition-colors duration-300"
         >
-          <Link href={`/pdp/${products[0].id}`} className="flex flex-col justify-between h-full w-full">
+          <Link href={`/pdp/${products[1]?.id}`} className="flex flex-col justify-between h-full w-full">
             <span className="font-sans text-[10px] tracking-widest uppercase text-obsidian-velvet/40 block mb-3">
-              {products[0].category} — {products[0].sku}
+              {products[1]?.category} — {products[1]?.sku}
             </span>
 
             <div className="flex-1 relative border border-muted-zinc/40 rounded-lg overflow-hidden min-h-[220px]">
-              <img
-                src={products[0].imageUrl}
-                alt={products[0].title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-              />
+              {products[1]?.imageUrl && (
+                <img
+                  src={products[1]?.imageUrl}
+                  alt={products[1]?.title}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                />
+              )}
             </div>
 
             <div className="mt-6 flex items-end justify-between">
               <div>
                 <h3 className="font-serif text-lg font-medium text-obsidian-velvet">
-                  {products[0].title}
+                  {products[1]?.title}
                 </h3>
                 <p className="font-sans text-xs text-obsidian-velvet/50 mt-1">
-                  {products[0].material}
+                  {products[1]?.material}
                 </p>
               </div>
               <span className="font-sans text-sm font-semibold text-obsidian-velvet">
-                ${products[0].price}
+                ${products[1]?.price}
               </span>
             </div>
           </Link>
@@ -231,7 +258,7 @@ export default function ShopFeedPage() {
             </div>
 
             <p className="font-serif text-xl font-light tracking-tight text-obsidian-velvet leading-relaxed">
-              &quot;The {products[0].title} pairs seamlessly with your registered Minimalist Tailoring style profile. Select to view dynamic styling matches.&quot;
+              &quot;The {products[recommendedIndex]?.title} {RECOMMENDATION_TEXTS[recommendationTextIndex]} Select to view dynamic styling matches.&quot;
             </p>
           </div>
 
@@ -240,7 +267,7 @@ export default function ShopFeedPage() {
               type="button"
               onClick={(e) => {
                 e.preventDefault();
-                window.dispatchEvent(new CustomEvent("open-concierge"));
+                router.push('/shop/catalog');
               }}
               className="w-full bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90 font-sans font-semibold text-xs rounded-md py-2.5 transition-all text-center block cursor-pointer border-none"
             >
@@ -249,71 +276,75 @@ export default function ShopFeedPage() {
           </div>
         </motion.div>
 
-        {/* Bento Card 4: Standard Catalog Card (Tailored Navy Trouser) */}
+        {/* Bento Card 4: Standard Catalog Card (Product 2) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
           className="block bg-surface-white border border-muted-zinc rounded-xl p-6 flex flex-col justify-between h-[360px] md:h-[400px] shadow-none hover:border-obsidian-velvet transition-colors duration-300"
         >
-          <Link href={`/pdp/${products[1].id}`} className="flex flex-col justify-between h-full w-full">
+          <Link href={`/pdp/${products[2]?.id}`} className="flex flex-col justify-between h-full w-full">
             <span className="font-sans text-[10px] tracking-widest uppercase text-obsidian-velvet/40 block mb-3">
-              {products[1].category} — {products[1].sku}
+              {products[2]?.category} — {products[2]?.sku}
             </span>
 
             <div className="flex-1 relative border border-muted-zinc/40 rounded-lg overflow-hidden min-h-[160px]">
-              <img
-                src={products[1].imageUrl}
-                alt={products[1].title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-              />
+              {products[2]?.imageUrl && (
+                <img
+                  src={products[2]?.imageUrl}
+                  alt={products[2]?.title}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                />
+              )}
             </div>
 
             <div className="mt-6 flex items-end justify-between">
               <div>
                 <h3 className="font-serif text-lg font-medium text-obsidian-velvet">
-                  {products[1].title}
+                  {products[2]?.title}
                 </h3>
                 <p className="font-sans text-xs text-obsidian-velvet/50 mt-1">
-                  {products[1].material}
+                  {products[2]?.material}
                 </p>
               </div>
               <span className="font-sans text-sm font-semibold text-obsidian-velvet">
-                ${products[1].price}
+                ${products[2]?.price}
               </span>
             </div>
           </Link>
         </motion.div>
 
-        {/* Bento Card 5: Standard Catalog Card (Silk Crepe Slip Dress) */}
+        {/* Bento Card 5: Standard Catalog Card (Product 3) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, transition: { duration: 0.2 } }}
           className="block bg-surface-white border border-muted-zinc rounded-xl p-6 flex flex-col justify-between h-[360px] md:h-[400px] shadow-none hover:border-obsidian-velvet transition-colors duration-300"
         >
-          <Link href={`/pdp/${products[2].id}`} className="flex flex-col justify-between h-full w-full">
+          <Link href={`/pdp/${products[3]?.id}`} className="flex flex-col justify-between h-full w-full">
             <span className="font-sans text-[10px] tracking-widest uppercase text-obsidian-velvet/40 block mb-3">
-              {products[2].category} — {products[2].sku}
+              {products[3]?.category} — {products[3]?.sku}
             </span>
 
             <div className="flex-1 relative border border-muted-zinc/40 rounded-lg overflow-hidden min-h-[160px]">
-              <img
-                src={products[2].imageUrl}
-                alt={products[2].title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-              />
+              {products[3]?.imageUrl && (
+                <img
+                  src={products[3]?.imageUrl}
+                  alt={products[3]?.title}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                />
+              )}
             </div>
 
             <div className="mt-6 flex items-end justify-between">
               <div>
                 <h3 className="font-serif text-lg font-medium text-obsidian-velvet">
-                  {products[2].title}
+                  {products[3]?.title}
                 </h3>
                 <p className="font-sans text-xs text-obsidian-velvet/50 mt-1">
-                  {products[2].material}
+                  {products[3]?.material}
                 </p>
               </div>
               <span className="font-sans text-sm font-semibold text-obsidian-velvet">
-                ${products[2].price}
+                ${products[3]?.price}
               </span>
             </div>
           </Link>

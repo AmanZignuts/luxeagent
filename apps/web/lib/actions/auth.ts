@@ -24,8 +24,7 @@ export async function loginAction(formData: FormData) {
 
   if (selectedRole && actualRole !== selectedRole) {
     await supabase.auth.signOut()
-    const readableActualRole = actualRole === 'merchant' ? 'Merchant' : 'Shopper'
-    return { error: `Access denied. This account is registered as a ${readableActualRole}.` }
+    return { error: `Invalid login credentials.` }
   }
 
   revalidatePath('/', 'layout')
@@ -92,12 +91,23 @@ export async function completeOnboardingAction(formData: FormData) {
   if (!user) return { error: 'Not authenticated' }
 
   const displayName = formData.get('displayName') as string
+  const phone = formData.get('phone') as string
+  const address = formData.get('address') as string
   const styleTokens = formData.getAll('styleTokens') as string[]
   const preferredSize = formData.get('preferredSize') as string
   const budgetMin = Number(formData.get('budgetMin') ?? 0)
   const budgetMax = Number(formData.get('budgetMax') ?? 10000)
   const preferredColors = formData.getAll('preferredColors') as string[]
   const preferredCategories = formData.getAll('preferredCategories') as string[]
+
+  if (phone || address) {
+    await supabase.auth.updateUser({
+      data: {
+        phone: phone || undefined,
+        address: address || undefined,
+      }
+    })
+  }
 
   const { error } = await supabase.from('user_style_profiles').upsert({
     user_id: user.id,

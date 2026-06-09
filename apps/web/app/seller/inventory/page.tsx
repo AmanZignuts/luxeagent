@@ -120,6 +120,7 @@ export default function InventoryLedgerPage() {
   // Refs for deduplicating API calls in React StrictMode
   const categoriesFetched = React.useRef(false);
   const lastFetchKey = React.useRef("");
+  const userIdRef = React.useRef<string | null>(null);
 
   // Search Debouncer Effect
   useEffect(() => {
@@ -167,14 +168,22 @@ export default function InventoryLedgerPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      
+      let userId = userIdRef.current;
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          userId = user.id;
+          userIdRef.current = user.id;
+        }
+      }
 
       let query = supabase
         .from("products")
         .select("*", { count: "exact" });
 
-      if (user) {
-        query = query.or(`seller_id.eq.${user.id},seller_id.is.null`);
+      if (userId) {
+        query = query.or(`seller_id.eq.${userId},seller_id.is.null`);
       } else {
         query = query.is("seller_id", null);
       }
@@ -258,6 +267,7 @@ export default function InventoryLedgerPage() {
 
       toast.success("Product deleted successfully");
       setProductToDelete(null);
+      lastFetchKey.current = ""; // Bust the local fetch deduplication cache
       fetchCatalog(); // Refresh the list
     } catch (e: any) {
       console.error(e);

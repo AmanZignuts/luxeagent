@@ -306,9 +306,6 @@ export default function SellerOrdersPage() {
                     <span>Advance to Next Stage</span>
                     <span>→</span>
                   </button>
-                  <p className="font-sans text-[9px] text-obsidian-velvet/40 text-center">
-                    Status update is reflected on the customer&apos;s order page in real time.
-                  </p>
                 </div>
               ) : (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">

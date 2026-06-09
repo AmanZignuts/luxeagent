@@ -297,9 +297,6 @@ export default function SellerDashboardPage() {
                 Weekly Revenue (Last 5 Weeks)
               </h3>
             </div>
-            <span className="bg-warm-linen border border-muted-zinc/80 px-2 py-0.5 rounded-sm text-[8px] font-sans font-bold text-obsidian-velvet uppercase tracking-wider">
-              Live
-            </span>
           </div>
 
           <div className="h-64 w-full bg-warm-linen/20 border border-muted-zinc/40 rounded-xl flex flex-col justify-between p-4 relative">

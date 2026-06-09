@@ -180,7 +180,9 @@ function IngestionForm() {
     try {
       if (editId) {
         const supabase = createClient();
-        const { error } = await supabase
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editId);
+        
+        let query = supabase
           .from("products")
           .update({
             title: values.productName,
@@ -190,10 +192,17 @@ function IngestionForm() {
             category: values.category,
             brand: values.brandName,
             material_composition: values.material,
-            image_urls: imageUrl ? [imageUrl] : [],
+            image_urls: imageUrl && !imageUrl.startsWith('blob:') ? [imageUrl] : [],
             stock_by_size: { M: Number(values.stock || 10) }
-          })
-          .or(`id.eq.${editId},sku.eq.${editId}`);
+          });
+
+        if (isUuid) {
+          query = query.eq('id', editId);
+        } else {
+          query = query.eq('sku', editId);
+        }
+
+        const { error } = await query;
 
         if (error) {
           throw new Error(error.message);
@@ -201,7 +210,7 @@ function IngestionForm() {
 
         toast.success("Product changes saved successfully to database.");
         setIsSaving(false);
-        router.push("/seller/inventory");
+        window.location.href = "/seller/inventory";
         return;
       }
 
@@ -226,7 +235,7 @@ function IngestionForm() {
 
       toast.success("Product successfully added to inventory!");
       setIsSaving(false);
-      router.push("/seller/inventory");
+      window.location.href = "/seller/inventory";
     } catch (err: any) {
       handleApiError(err, "Product Vision Ingestion");
       setIsSaving(false);

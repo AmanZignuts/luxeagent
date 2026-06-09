@@ -15,7 +15,9 @@ export default function CustomerLayout({
 }) {
   return (
     <BagProvider>
-      <CustomerLayoutContent>{children}</CustomerLayoutContent>
+      <React.Suspense fallback={null}>
+        <CustomerLayoutContent>{children}</CustomerLayoutContent>
+      </React.Suspense>
     </BagProvider>
   );
 }

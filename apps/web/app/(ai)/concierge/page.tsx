@@ -206,7 +206,11 @@ export default function ConciergePageV2() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  const [chatId] = useState(() => crypto.randomUUID());
+  const [chatId, setChatId] = useState("");
+
+  useEffect(() => {
+    setChatId(crypto.randomUUID());
+  }, []);
   const [input, setInput] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);

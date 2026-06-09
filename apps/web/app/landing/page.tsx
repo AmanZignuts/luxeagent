@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const PRODUCTS_WOMEN = [
   {
-    id: "w1",
+    id: "dress-1",
     title: "Silk Crepe Slip Dress",
     category: "Evening Wear",
     price: 680,
@@ -15,42 +15,42 @@ const PRODUCTS_WOMEN = [
     image: "/product_dress.png",
   },
   {
-    id: "w2",
-    title: "Quiet Luxury Linen Shirt",
-    category: "Ready-to-Wear",
-    price: 350,
+    id: "LX-DR-002",
+    title: "Ivory Column Dress",
+    category: "Evening Wear",
+    price: 360,
     rating: 4.9,
-    image: "/luxe_quietluxury.png",
+    image: "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=800",
   },
   {
-    id: "w3",
-    title: "Sparkling Beige Polo",
-    category: "Knitwear",
-    price: 320,
+    id: "LX-TP-002",
+    title: "Slate Grey Cashmere Turtleneck",
+    category: "Tops",
+    price: 285,
     rating: 4.95,
-    image: "/luxe_knitwear.png",
+    image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800",
   },
   {
-    id: "w4",
-    title: "Avant-Garde Draped Coat",
+    id: "LX-OW-001",
+    title: "Camel Wool Overcoat",
     category: "Outerwear",
     price: 890,
     rating: 4.8,
-    image: "/luxe_avantgarde.png",
+    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800",
   },
 ];
 
 const PRODUCTS_MEN = [
   {
-    id: "m1",
-    title: "100% Cotton Regular Fit Shirt",
+    id: "overshirt-1",
+    title: "Linen Blend Overshirt",
     category: "Ready-to-Wear",
     price: 380,
     rating: 4.95,
     image: "/product_overshirt.png",
   },
   {
-    id: "m2",
+    id: "trouser-1",
     title: "Tailored Navy Trouser",
     category: "Custom Fit",
     price: 450,
@@ -58,20 +58,20 @@ const PRODUCTS_MEN = [
     image: "/product_trouser.png",
   },
   {
-    id: "m3",
-    title: "Heritage Atelier Blazer",
+    id: "LX-MN-003",
+    title: "The Atelier Blazer",
     category: "Formal Wear",
-    price: 850,
+    price: 595,
     rating: 4.85,
-    image: "/luxe_menswear.png",
+    image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800",
   },
   {
-    id: "m4",
-    title: "Resort Linen Overshirt",
+    id: "LX-MN-001",
+    title: "Chalk Linen Relaxed-Fit Shirt",
     category: "Ready-to-Wear",
-    price: 380,
+    price: 165,
     rating: 4.95,
-    image: "/luxe_resort.png",
+    image: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800",
   },
 ];
 
@@ -193,12 +193,23 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [loaderVisible, setLoaderVisible] = useState(true);
+  const [loaderFading, setLoaderFading] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => setLoaderFading(true), 2000);
+    const timer2 = setTimeout(() => setLoaderVisible(false), 2800);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, []);
 
   useEffect(() => {
@@ -253,22 +264,26 @@ export default function LandingPage() {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* ── Announcement Bar ── */}
-      {announcementVisible && (
-        <div className="relative bg-obsidian-velvet text-surface-white flex items-center justify-center px-8 py-2.5 text-center">
-          <p className="font-sans text-[10px] tracking-widest uppercase">
-            ✦ &nbsp; AI-Powered Personal Styling — Early Access Now Open &nbsp;·&nbsp;{" "}
-            <Link href="/register" className="underline underline-offset-2 hover:text-tint-champagne transition-colors font-bold">
-              Join the Atelier
-            </Link>
-            &nbsp; ✦
-          </p>
-          <button
-            onClick={() => setAnnouncementVisible(false)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-white/60 hover:text-surface-white transition-colors text-sm cursor-pointer"
-          >
-            ✕
-          </button>
+      {/* ── Cinematic Loader ── */}
+      {loaderVisible && (
+        <div
+          className={`fixed inset-0 z-[100] bg-obsidian-velvet flex flex-col items-center justify-center transition-opacity duration-700 ${
+            loaderFading ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className="flex flex-col items-center space-y-8">
+            <span className="font-serif text-4xl sm:text-5xl font-light tracking-[0.2em] text-surface-white animate-[pulse_2.5s_ease-in-out_infinite]">
+              Vestira
+            </span>
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-px h-16 bg-surface-white/10 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1/2 bg-surface-white/80 animate-[slideDown_1.5s_ease-in-out_infinite]" />
+              </div>
+              <span className="font-sans text-[8px] tracking-[0.4em] uppercase text-surface-white/40">
+                Curating Exhibition
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -299,25 +314,6 @@ export default function LandingPage() {
 
           {/* Right actions */}
           <div className="flex items-center gap-4">
-            {/* Search */}
-            <button className="hidden md:flex items-center gap-2 border border-muted-zinc rounded-sm px-3 py-1.5 text-[10px] font-sans text-obsidian-velvet/50 hover:border-obsidian-velvet/40 hover:text-obsidian-velvet transition-all w-40 cursor-pointer bg-transparent">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-              </svg>
-              <span>Search</span>
-            </button>
-
-            {/* Bag */}
-            <Link
-              href="/shop"
-              className="flex items-center gap-1.5 text-[10px] font-sans font-semibold uppercase tracking-wider text-obsidian-velvet hover:opacity-75 transition-opacity"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
-              </svg>
-              Bag
-            </Link>
-
             {/* CTA */}
             {isLoggedIn ? (
               <div className="hidden md:block relative">
@@ -432,7 +428,7 @@ export default function LandingPage() {
                   href="/register"
                   className="bg-surface-white text-obsidian-velvet font-sans font-semibold text-[10px] uppercase tracking-widest px-7 py-3.5 rounded-sm hover:bg-tint-champagne transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  Enter the Atelier
+                  Enter Vestira
                 </Link>
                 <Link
                   href="/shop"
@@ -457,8 +453,8 @@ export default function LandingPage() {
             {/* Right: Floating product cards */}
             <div className="hidden lg:flex flex-col gap-3 mb-12 hero-cards-animate">
               {[
-                { title: "100% Cotton Regular Fit Shirt", sku: "LA-SH-039", price: "$380", image: "/product_overshirt.png", category: "READY-TO-WEAR", id: "m1" },
-                { title: "Silk Crepe Slip Dress", sku: "LA-DR-094", price: "$680", image: "/product_dress.png", category: "EVENING WEAR", id: "w1" },
+                { title: "100% Cotton Regular Fit Shirt", sku: "LA-SH-039", price: "$380", image: "/product_overshirt.png", category: "READY-TO-WEAR", id: "overshirt-1" },
+                { title: "Silk Crepe Slip Dress", sku: "LA-DR-094", price: "$680", image: "/product_dress.png", category: "EVENING WEAR", id: "dress-1" },
               ].map((card) => (
                 <Link
                   href={`/pdp/${card.id}`}
@@ -786,29 +782,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Email CTA Strip ── */}
-      <section className="py-14 bg-surface-white border-t border-muted-zinc">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="font-serif text-2xl font-light text-obsidian-velvet mb-1">
-              Join the Private Atelier List
-            </h3>
-            <p className="font-sans text-xs text-obsidian-velvet/50">
-              First access to new collections, exclusive styling events, and personalized curation drops.
-            </p>
-          </div>
-          <div className="flex items-center gap-0 border border-muted-zinc rounded-sm overflow-hidden flex-shrink-0 w-full md:w-auto">
-            <input
-              type="email"
-              placeholder="Your email address"
-              className="px-4 py-3 font-sans text-xs text-obsidian-velvet bg-transparent outline-none placeholder-obsidian-velvet/30 w-64"
-            />
-            <button className="bg-obsidian-velvet text-surface-white font-sans font-semibold text-[9px] uppercase tracking-widest px-5 py-3 hover:bg-obsidian-velvet/85 transition-colors flex-shrink-0 cursor-pointer">
-              Subscribe
-            </button>
-          </div>
-        </div>
-      </section>
+
 
       {/* ── Footer ── */}
       <footer className="bg-obsidian-velvet text-surface-white pt-16 pb-8">

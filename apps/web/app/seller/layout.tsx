@@ -34,6 +34,13 @@ export default function SellerLayout({
     { href: "/seller/settings", label: "Settings" },
   ];
 
+  const isAuthPage = pathname === '/seller/login' || pathname === '/seller/register';
+
+  // Auth pages get a clean full-screen layout — no sidebar
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-warm-linen font-sans antialiased text-obsidian-velvet relative flex">
       

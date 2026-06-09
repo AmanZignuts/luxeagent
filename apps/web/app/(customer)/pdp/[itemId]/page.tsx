@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { useBag } from "../../BagContext";
 import { createClient } from "@/lib/supabase/client";
@@ -63,13 +63,9 @@ const STATIC_CATALOG: Record<string, ProductDetail> = {
   }
 };
 
-export default function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ itemId: string }>;
-}) {
-  const resolvedParams = use(params);
-  const { itemId } = resolvedParams;
+export default function ProductDetailPage() {
+  const params = useParams();
+  const itemId = params.itemId as string;
 
   const { bagItems, addToBag, setIsBagDrawerOpen } = useBag();
   const router = useRouter();

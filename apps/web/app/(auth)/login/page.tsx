@@ -20,7 +20,6 @@ const loginSchema = yup.object().shape({
 type LoginFormValues = yup.InferType<typeof loginSchema>;
 
 export default function LoginPage() {
-  const [context, setContext] = useState<"shopper" | "merchant">("shopper");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -37,7 +36,7 @@ export default function LoginPage() {
     const formData = new FormData();
     formData.append("email", data.email);
     formData.append("password", data.password);
-    formData.append("role", context);
+    formData.append("role", "shopper");
 
     try {
       const res = await loginAction(formData);
@@ -98,31 +97,7 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Role/Context Toggle Pill */}
-            <div className="flex p-0.5 rounded-md border border-muted-zinc bg-warm-linen/40 backdrop-blur-sm mb-6 w-full">
-              <button
-                type="button"
-                onClick={() => setContext("shopper")}
-                className={`flex-1 rounded-md px-4 py-2 text-xs font-semibold font-sans transition-all duration-300 ${
-                  context === "shopper"
-                    ? "bg-obsidian-velvet text-surface-white"
-                    : "text-obsidian-velvet/60 hover:text-obsidian-velvet"
-                }`}
-              >
-                Shopper
-              </button>
-              <button
-                type="button"
-                onClick={() => setContext("merchant")}
-                className={`flex-1 rounded-md px-4 py-2 text-xs font-semibold font-sans transition-all duration-300 ${
-                  context === "merchant"
-                    ? "bg-obsidian-velvet text-surface-white"
-                    : "text-obsidian-velvet/60 hover:text-obsidian-velvet"
-                }`}
-              >
-                Merchant
-              </button>
-            </div>
+
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <FormField label="Email Address" error={errors.email?.message}>

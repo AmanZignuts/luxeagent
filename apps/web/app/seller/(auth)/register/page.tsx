@@ -20,7 +20,7 @@ const registerSchema = yup.object().shape({
 
 type RegisterFormValues = yup.InferType<typeof registerSchema>;
 
-export default function RegisterPage() {
+export default function MerchantRegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -38,48 +38,50 @@ export default function RegisterPage() {
     formData.append("fullName", data.fullName);
     formData.append("email", data.email);
     formData.append("password", data.password);
-    formData.append("role", "shopper");
+    formData.append("role", "merchant"); // Always merchant — no toggle
 
     try {
       const res = await registerAction(formData);
       if (res && res.error) {
-        handleApiError(res.error, "User Registration Action");
+        handleApiError(res.error, "Merchant Register Action");
         setIsSubmitting(false);
       } else {
-        toast.success("Successfully registered account.");
+        toast.success("Merchant account created. Welcome to the console.");
       }
     } catch (err: any) {
-      handleApiError(err, "User Registration");
+      handleApiError(err, "Merchant Register");
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="flex min-h-screen w-screen overflow-x-hidden bg-warm-linen">
-      {/* Left 50% Visual Column — Campaign Visual */}
+      {/* Left 50% Visual Column */}
       <div className="relative hidden w-1/2 overflow-hidden border-r border-muted-zinc lg:block">
         <img
-          alt="Quiet Luxury Knitwear"
+          alt="Vestira Editorial"
           className="absolute inset-0 w-full h-full object-cover"
-          src="/luxe_knitwear.png"
+          src="/luxe_gateway.png"
         />
         <div className="absolute inset-0 bg-black/5 mix-blend-multiply pointer-events-none z-10" />
 
-        {/* Campaign Visual Label */}
         <div className="absolute bottom-10 left-10 z-20 text-white drop-shadow-sm">
           <h2 className="font-serif text-2xl tracking-tight font-light">Vestira</h2>
-          <p className="font-sans text-xs tracking-widest uppercase opacity-80 mt-1">Campaign Lookbook — Atelier N° 3</p>
+          <p className="font-sans text-xs tracking-widest uppercase opacity-80 mt-1">Merchant Console — Restricted Access</p>
         </div>
       </div>
 
-      {/* Right 50% Interaction Column — Alabaster Linen Canvas */}
+      {/* Right 50% Interaction Column */}
       <div className="flex w-full flex-col justify-between bg-warm-linen p-8 lg:w-1/2 sm:p-16">
-        
+
         {/* Header Branding Row */}
         <div className="flex items-center justify-between">
-          <Link href="/login" className="font-serif text-2xl font-light tracking-tight text-obsidian-velvet">
+          <Link href="/" className="font-serif text-2xl font-light tracking-tight text-obsidian-velvet">
             Vestira
           </Link>
+          <span className="font-sans text-[9px] tracking-widest uppercase text-obsidian-velvet/30 border border-muted-zinc px-2 py-1 rounded">
+            Merchant Portal
+          </span>
         </div>
 
         {/* Core Card Console */}
@@ -92,14 +94,12 @@ export default function RegisterPage() {
           >
             <div className="mb-8">
               <h1 className="font-serif text-3xl font-light tracking-tight text-obsidian-velvet">
-                Create Account
+                Create Merchant Account
               </h1>
               <p className="font-sans text-sm text-obsidian-velvet/60 mt-2">
-                Create your account to unlock your personalized styling concierge.
+                Register an authorized merchant account to manage inventory and orders.
               </p>
             </div>
-
-
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <FormField label="Full Name" error={errors.fullName?.message}>
@@ -107,7 +107,7 @@ export default function RegisterPage() {
                   type="text"
                   disabled={isSubmitting}
                   error={!!errors.fullName}
-                  placeholder="Jean Lauren"
+                  placeholder="Store Owner Name"
                   {...register("fullName")}
                 />
               </FormField>
@@ -117,7 +117,7 @@ export default function RegisterPage() {
                   type="email"
                   disabled={isSubmitting}
                   error={!!errors.email}
-                  placeholder="client@vestira.ai"
+                  placeholder="merchant@vestira.ai"
                   {...register("email")}
                 />
               </FormField>
@@ -139,7 +139,7 @@ export default function RegisterPage() {
                 disabled={isSubmitting}
                 className="w-full"
               >
-                Register
+                Create Merchant Account
               </Button>
             </form>
           </motion.div>
@@ -147,10 +147,10 @@ export default function RegisterPage() {
 
         {/* Base Footnotes */}
         <div className="flex flex-col items-center justify-between gap-4 border-t border-muted-zinc/60 pt-6 text-center sm:flex-row text-xs font-sans text-obsidian-velvet/60">
-          <span className="text-obsidian-velvet/60">
-            All accounts are protected with secure encryption.
+          <span className="text-obsidian-velvet/40">
+            This portal is for authorized merchants only.
           </span>
-          <Link href="/login" className="hover:underline hover:text-obsidian-velvet transition-colors font-semibold">
+          <Link href="/seller/login" className="hover:underline hover:text-obsidian-velvet transition-colors font-semibold">
             Already have an account? Sign In
           </Link>
         </div>

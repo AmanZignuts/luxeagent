@@ -17,14 +17,10 @@ import { handleApiError } from "@/lib/utils/error-handler";
 
 
 const checkoutSchema = yup.object().shape({
-  firstName: yup
+  fullName: yup
     .string()
-    .required("First name is required.")
-    .matches(/^[A-Za-z\s\-]+$/, "First name must contain only letters and spaces."),
-  lastName: yup
-    .string()
-    .required("Last name is required.")
-    .matches(/^[A-Za-z\s\-]+$/, "Last name must contain only letters and spaces."),
+    .required("Full name is required.")
+    .matches(/^[A-Za-z\s\-]+$/, "Full name must contain only letters and spaces."),
   email: yup.string().email("Please enter a valid email format.").required("Email address is required."),
   address: yup.string().min(8, "Please enter a complete delivery address.").required("Delivery address is required."),
   usingSavedCard: yup.boolean().default(true),
@@ -102,8 +98,7 @@ function CheckoutPageContent() {
   } = useForm<any>({
     resolver: yupResolver(checkoutSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
+      fullName: "",
       email: "",
       address: "",
       usingSavedCard: true,
@@ -211,40 +206,30 @@ function CheckoutPageContent() {
             .maybeSingle();
 
           if (profile && profile.display_name) {
-            const parts = profile.display_name.trim().split(" ");
-            if (parts.length > 1) {
-              setValue("firstName", parts[0]);
-              setValue("lastName", parts.slice(1).join(" "));
-            } else {
-              setValue("firstName", profile.display_name);
-            }
+            setValue("fullName", profile.display_name);
           } else if (user.user_metadata?.full_name) {
-            const metaName = user.user_metadata.full_name;
-            const parts = metaName.trim().split(" ");
-            if (parts.length > 1) {
-              setValue("firstName", parts[0]);
-              setValue("lastName", parts.slice(1).join(" "));
-            } else {
-              setValue("firstName", metaName);
-            }
+            setValue("fullName", user.user_metadata.full_name);
           }
 
-          // Fetch last order's shipping address as default
-          const { data: lastOrder } = await supabase
-            .from("orders")
-            .select("shipping_address")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          // Auto-fill address from profile metadata first, then fall back to last order
+          if (user.user_metadata?.address) {
+            setValue("address", user.user_metadata.address);
+          } else {
+            const { data: lastOrder } = await supabase
+              .from("orders")
+              .select("shipping_address")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          if (lastOrder && lastOrder.shipping_address) {
-            const addr = lastOrder.shipping_address as any;
-            if (addr && typeof addr === "object") {
-              const formatted = addr.street || addr.streetLine || addr.formatted || "";
-              setValue("address", formatted);
-            } else if (typeof addr === "string") {
-              setValue("address", addr);
+            if (lastOrder && lastOrder.shipping_address) {
+              const addr = lastOrder.shipping_address as any;
+              if (addr && typeof addr === "object") {
+                setValue("address", addr.street || addr.streetLine || addr.formatted || "");
+              } else if (typeof addr === "string") {
+                setValue("address", addr);
+              }
             }
           }
 
@@ -302,7 +287,7 @@ function CheckoutPageContent() {
   };
 
   const handleContinueToPayment = async () => {
-    const isValid = await trigger(["firstName", "lastName", "email", "address"]);
+    const isValid = await trigger(["fullName", "email", "address"]);
     if (isValid) {
       setActiveTab("payment");
     } else {
@@ -348,7 +333,7 @@ function CheckoutPageContent() {
             total: total,
             status: "CONFIRMED",
             shipping_address: {
-              name: `${values.firstName} ${values.lastName}`,
+              name: values.fullName,
               street: values.address,
               email: values.email,
             },
@@ -362,7 +347,7 @@ function CheckoutPageContent() {
         // Sync name back to user style profile
         await supabase.from("user_style_profiles").upsert({
           user_id: user.id,
-          display_name: `${values.firstName} ${values.lastName}`,
+          display_name: values.fullName,
           onboarding_complete: true,
         });
       }
@@ -390,6 +375,31 @@ function CheckoutPageContent() {
         <span className="font-serif text-sm text-obsidian-velvet/40 tracking-wider uppercase">
           Aligning Preferences...
         </span>
+      </div>
+    );
+  }
+
+  // Empty bag guard — nothing to checkout
+  if (activeItems.length === 0) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6 space-y-6">
+        <div className="w-16 h-16 rounded-full border border-muted-zinc flex items-center justify-center">
+          <svg className="w-7 h-7 text-obsidian-velvet/30" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h2 className="font-serif text-2xl font-light text-obsidian-velvet tracking-tight">Your bag is empty</h2>
+          <p className="font-sans text-sm text-obsidian-velvet/50 max-w-xs">
+            Add pieces to your bag before proceeding to checkout.
+          </p>
+        </div>
+        <Link
+          href="/shop/catalog"
+          className="inline-flex items-center gap-2 font-sans text-xs font-bold uppercase tracking-widest text-surface-white bg-obsidian-velvet hover:bg-obsidian-velvet/90 transition-colors px-6 py-3 rounded-xl"
+        >
+          Browse Catalog
+        </Link>
       </div>
     );
   }
@@ -464,23 +474,14 @@ function CheckoutPageContent() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField label="First Name" error={errors.firstName?.message}>
+                <div>
+                  <FormField label="Full Name" error={errors.fullName?.message}>
                     <Input
                       type="text"
                       disabled={isAuthorizing}
-                      error={!!errors.firstName}
-                      placeholder="Jean"
-                      {...register("firstName")}
-                    />
-                  </FormField>
-                  <FormField label="Last Name" error={errors.lastName?.message}>
-                    <Input
-                      type="text"
-                      disabled={isAuthorizing}
-                      error={!!errors.lastName}
-                      placeholder="Lauren"
-                      {...register("lastName")}
+                      error={!!errors.fullName}
+                      placeholder="Jean Lauren"
+                      {...register("fullName")}
                     />
                   </FormField>
                 </div>

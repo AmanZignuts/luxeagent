@@ -51,12 +51,21 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/concierge') ||
     (pathname.startsWith('/onboarding') && !pathname.startsWith('/onboarding/merchant'))
 
+  const isSellerLoginRoute =
+    pathname === '/seller/login' || pathname === '/seller/register'
+
   const isSellerRoute =
-    pathname.startsWith('/seller') ||
+    (pathname.startsWith('/seller') && pathname !== '/seller/login' && pathname !== '/seller/register') ||
     pathname.startsWith('/onboarding/merchant')
 
-  // ── 0. Always allow public routes ────────────────────────────────
-  if (isPublicRoute) {
+  // ── 0. Always allow public routes & seller login page ─────────────
+  if (isPublicRoute || isSellerLoginRoute) {
+    // If already logged in as merchant, bounce to dashboard
+    if (user && user.user_metadata?.role === 'merchant') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/seller/dashboard'
+      return NextResponse.redirect(url)
+    }
     return supabaseResponse
   }
 

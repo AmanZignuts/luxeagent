@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +13,7 @@ interface Product {
   price: number;
   material: string;
   category: string;
+  rawCategory?: string;
   imageUrl: string;
   inStock: boolean;
   sizes: string[];
@@ -137,19 +138,27 @@ function CatalogListingContent() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [isDbEmpty, setIsDbEmpty] = useState(false);
 
-  const isInitialRun = useRef(true);
-
   // Dynamic filter lists compiled from database products
   const [categoriesList, setCategoriesList] = useState<string[]>([]);
   const [sizesList, setSizesList] = useState<string[]>(["XS", "S", "M", "L", "XL", "XXL", "ONE SIZE"]);
 
-  // Active Filter States
+  // Active Filter States — all derived from URL search params for back-nav persistence
+  // useMemo stabilizes array references so useEffect deps don't trigger infinite loops
+  const selectedCategories = useMemo(
+    () => searchParams.getAll("cat"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams.toString()]
+  );
+  const selectedSizes = useMemo(
+    () => searchParams.getAll("size"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams.toString()]
+  );
+  const inStockOnly = searchParams.get("inStock") === "1";
+  const sortBy = (searchParams.get("sort") || "featured") as "featured" | "price-low" | "price-high";
   const searchQuery = searchParams.get("q") || "";
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<"featured" | "price-low" | "price-high">("featured");
-
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  // Single stable primitive used as the fetch effect dependency
+  const searchParamsStr = searchParams.toString();
 
   // Autocomplete Search States
   const [searchQueryInput, setSearchQueryInput] = useState(searchQuery);
@@ -193,6 +202,7 @@ function CatalogListingContent() {
               price: Number(p.price) || 0,
               material: p.material_composition || "Selected Fiber",
               category: p.category ? capitalize(p.category) : "Ready-to-Wear",
+              rawCategory: p.category || "",
               imageUrl: (p.image_urls && p.image_urls.length > 0) ? p.image_urls[0] : "/product_overshirt.png",
               inStock: totalStock > 0,
               sizes: p.sizes || ["M"]
@@ -233,83 +243,7 @@ function CatalogListingContent() {
     fetchFilterOptions();
   }, []);
 
-  // 2. Fetch filtered products from Supabase
-  useEffect(() => {
-    if (initialLoading) return;
-
-    if (isInitialRun.current) {
-      isInitialRun.current = false;
-      return;
-    }
-
-    async function fetchFiltered() {
-      if (isDbEmpty) return;
-
-      setLoadingProducts(true);
-      try {
-        const supabase = createClient();
-        let query = supabase
-          .from("products")
-          .select("*")
-          .eq("is_active", true);
-
-        if (searchQuery) {
-          query = query.or(`title.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%,material_composition.ilike.%${searchQuery}%`);
-        }
-
-        if (selectedCategories.length > 0) {
-          query = query.in("category", selectedCategories);
-        }
-
-        if (selectedSizes.length > 0) {
-          query = query.overlaps("sizes", selectedSizes);
-        }
-
-        if (sortBy === "price-low") {
-          query = query.order("price", { ascending: true });
-        } else if (sortBy === "price-high") {
-          query = query.order("price", { ascending: false });
-        } else {
-          query = query.order("is_featured", { ascending: false }).order("created_at", { ascending: false });
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        if (data) {
-          const dbMapped: Product[] = data.map((p) => {
-            const stockMap = p.stock_by_size as Record<string, number> | null;
-            const totalStock = stockMap ? Object.values(stockMap).reduce((a, b) => a + b, 0) : 0;
-            return {
-              id: p.id,
-              sku: p.sku,
-              title: p.title,
-              price: Number(p.price) || 0,
-              material: p.material_composition || "Selected Fiber",
-              category: p.category ? capitalize(p.category) : "Ready-to-Wear",
-              imageUrl: (p.image_urls && p.image_urls.length > 0) ? p.image_urls[0] : "/product_overshirt.png",
-              inStock: totalStock > 0,
-              sizes: p.sizes || ["M"]
-            };
-          });
-
-          let finalProducts = dbMapped;
-          if (inStockOnly) {
-            finalProducts = dbMapped.filter((p) => p.inStock);
-          }
-          setProducts(finalProducts);
-        }
-      } catch (err) {
-        console.error("Failed to load catalog products from Supabase:", err);
-      } finally {
-        setLoadingProducts(false);
-      }
-    }
-
-    fetchFiltered();
-  }, [searchQuery, selectedCategories, selectedSizes, inStockOnly, sortBy, initialLoading, isDbEmpty]);
-
-  // 3. Debounce search query updates and sync with URL
+  // 2. Debounce search query updates and sync with URL
   useEffect(() => {
     const handler = setTimeout(() => {
       if (searchQueryInput !== searchQuery) {
@@ -373,38 +307,46 @@ function CatalogListingContent() {
     };
   }, [isFilterDrawerOpen]);
 
-  // Toggle handlers for desktop (immediate application)
+  // Helper to update URL params
+  const updateParam = (updates: Record<string, string | string[] | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      params.delete(key);
+      if (Array.isArray(value)) {
+        value.forEach(v => params.append(key, v));
+      } else if (value !== null) {
+        params.set(key, value);
+      }
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  // Toggle handlers — write to URL
   const handleCategoryToggle = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((item) => item !== cat) : [...prev, cat]
-    );
+    const next = selectedCategories.includes(cat)
+      ? selectedCategories.filter(c => c !== cat)
+      : [...selectedCategories, cat];
+    updateParam({ cat: next });
   };
 
   const handleSizeToggle = (sz: string) => {
-    setSelectedSizes((prev) =>
-      prev.includes(sz) ? prev.filter((item) => item !== sz) : [...prev, sz]
-    );
+    const next = selectedSizes.includes(sz)
+      ? selectedSizes.filter(s => s !== sz)
+      : [...selectedSizes, sz];
+    updateParam({ size: next });
   };
 
   const handleResetFilters = () => {
     setSearchQueryInput("");
-    setInStockOnly(false);
-    setSelectedCategories([]);
-    setSelectedSizes([]);
-    setSortBy("featured");
-    // Clear pending drawer states too
     setPendingCategories([]);
     setPendingSizes([]);
     setPendingInStockOnly(false);
-    
-    // Also clear the URL query
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("q");
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    router.replace(pathname, { scroll: false });
   };
 
-  // Fallback filtration for static catalog
-  const filteredStaticProducts = STATIC_CATALOG
+
+  // Synchronous client-side filtration based on allDbProducts
+  const derivedProducts = (isDbEmpty ? STATIC_CATALOG : allDbProducts)
     .filter((product) => {
       const matchesSearch =
         product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -412,7 +354,8 @@ function CatalogListingContent() {
         product.material.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCategory =
-        selectedCategories.length === 0 || selectedCategories.includes(product.category.toLowerCase().replace(/ /g, "-"));
+        selectedCategories.length === 0 || 
+        selectedCategories.includes(product.rawCategory ?? product.category.toLowerCase().replace(/ /g, "-"));
 
       const matchesSize =
         selectedSizes.length === 0 ||
@@ -433,7 +376,7 @@ function CatalogListingContent() {
       return 0;
     });
 
-  const finalDisplayProducts = isDbEmpty ? filteredStaticProducts : products;
+  const finalDisplayProducts = derivedProducts;
 
   if (initialLoading) {
     return (
@@ -553,7 +496,7 @@ function CatalogListingContent() {
             {/* Sort Dropdown */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "featured" | "price-low" | "price-high")}
+              onChange={(e) => updateParam({ sort: e.target.value === "featured" ? null : e.target.value })}
               className="bg-surface-white border border-muted-zinc rounded-md px-3 py-1.5 text-xs font-sans text-obsidian-velvet focus:outline-none focus:border-obsidian-velvet cursor-pointer select-none"
             >
               <option value="featured">Sort: Featured</option>
@@ -623,7 +566,7 @@ function CatalogListingContent() {
               <input
                 type="checkbox"
                 checked={inStockOnly}
-                onChange={() => setInStockOnly(!inStockOnly)}
+                onChange={() => updateParam({ inStock: inStockOnly ? null : "1" })}
                 className="w-3.5 h-3.5 border border-muted-zinc rounded accent-obsidian-velvet cursor-pointer"
               />
               <span>In Stock Only</span>
@@ -774,9 +717,13 @@ function CatalogListingContent() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedCategories(pendingCategories);
-                  setSelectedSizes(pendingSizes);
-                  setInStockOnly(pendingInStockOnly);
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("cat");
+                  params.delete("size");
+                  if (pendingInStockOnly) params.set("inStock", "1"); else params.delete("inStock");
+                  pendingCategories.forEach(c => params.append("cat", c));
+                  pendingSizes.forEach(s => params.append("size", s));
+                  router.replace(`${pathname}?${params.toString()}`, { scroll: false });
                   setIsFilterDrawerOpen(false);
                 }}
                 className="w-full bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90 font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer border-none"

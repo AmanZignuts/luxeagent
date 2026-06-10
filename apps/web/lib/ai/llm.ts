@@ -1,8 +1,10 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createGroq } from '@ai-sdk/groq'
+import { createOpenAI } from '@ai-sdk/openai'
 
 let googleInstance: ReturnType<typeof createGoogleGenerativeAI> | null = null
 let groqInstance: ReturnType<typeof createGroq> | null = null
+let openaiInstance: ReturnType<typeof createOpenAI> | null = null
 
 function getGoogleInstance(): ReturnType<typeof createGoogleGenerativeAI> {
   if (!googleInstance) {
@@ -22,16 +24,33 @@ function getGroqInstance(): ReturnType<typeof createGroq> {
   return groqInstance
 }
 
+function getOpenAIInstance(): ReturnType<typeof createOpenAI> {
+  if (!openaiInstance) {
+    openaiInstance = createOpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiInstance
+}
+
 /**
  * Returns the configured LLM model instance for chat or vision tasks.
- * Supports switching between Groq and Google Gemini via the LLM_PROVIDER env variable.
+ * Supports switching between Groq, Google Gemini, and OpenAI via the LLM_PROVIDER env variable.
  */
 export function getModel(type: 'chat' | 'vision') {
   const provider = process.env.LLM_PROVIDER || 'groq'
 
   if (provider === 'google') {
-    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
     return getGoogleInstance()(modelName)
+  } else if (provider === 'openai') {
+    if (type === 'chat') {
+      const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+      return getOpenAIInstance()(modelName)
+    } else {
+      const modelName = process.env.OPENAI_VISION_MODEL || 'gpt-4o'
+      return getOpenAIInstance()(modelName)
+    }
   } else {
     if (type === 'chat') {
       const modelName = "llama-3.1-8b-instant"

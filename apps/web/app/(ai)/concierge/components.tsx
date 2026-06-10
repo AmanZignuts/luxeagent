@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useBag } from "../../(customer)/BagContext";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 
 // ─────────────────────────────────────────────────────────────────────
 // TYPE DEFINITIONS
@@ -936,6 +938,63 @@ export function OutfitBuilder({
   const [allAdded, setAllAdded] = useState(false);
   const [addingAll, setAddingAll] = useState(false);
 
+  // Database available sizes state
+  const [dbSizes, setDbSizes] = useState<Record<string, string[]>>({});
+  const [loadingSizes, setLoadingSizes] = useState<Record<string, boolean>>({});
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+
+  // Keep track of fetched IDs to avoid redundant calls
+  const fetchedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Clean up states for removed items
+    const currentIds = new Set(look.map((i) => i.id));
+    fetchedIdsRef.current.forEach((id) => {
+      if (!currentIds.has(id)) {
+        fetchedIdsRef.current.delete(id);
+        setDbSizes((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setSelectedSizes((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    });
+
+    look.forEach((item) => {
+      // If sizes for this item are already loaded, loading, or fetched, skip!
+      if (fetchedIdsRef.current.has(item.id)) {
+        return;
+      }
+
+      fetchedIdsRef.current.add(item.id);
+      setLoadingSizes((prev) => ({ ...prev, [item.id]: true }));
+
+      fetch(`/api/inventory?sku=${encodeURIComponent(item.sku)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.type === "size_picker" && data.availableSizes) {
+            const sizes = data.availableSizes.map((s: any) => s.size);
+            setDbSizes((prev) => ({ ...prev, [item.id]: sizes }));
+            if (sizes.length > 0) {
+              setSelectedSizes((prev) => ({ ...prev, [item.id]: sizes[0] }));
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load inventory for " + item.sku, err);
+          fetchedIdsRef.current.delete(item.id);
+        })
+        .finally(() => {
+          setLoadingSizes((prev) => ({ ...prev, [item.id]: false }));
+        });
+    });
+  }, [look]);
+
   const CATEGORY_LABELS: Record<string, string> = {
     tops: "Top",
     trousers: "Bottom",
@@ -945,38 +1004,73 @@ export function OutfitBuilder({
     footwear: "Footwear",
   };
 
-  const CATEGORY_ICONS: Record<string, string> = {
-    tops: "◇",
-    trousers: "▽",
-    outerwear: "◈",
-    accessories: "○",
-    dresses: "✦",
-    footwear: "◉",
+  const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+    tops: (
+      <svg className="w-4.5 h-4.5 text-obsidian-velvet/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12l3 5-3 2v11H6V10L3 8l3-5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 3a3 3 0 0 0 6 0" />
+      </svg>
+    ),
+    trousers: (
+      <svg className="w-4.5 h-4.5 text-obsidian-velvet/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 3h8v18l-4-3-4-3V3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12" />
+      </svg>
+    ),
+    outerwear: (
+      <svg className="w-4.5 h-4.5 text-obsidian-velvet/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3h14v18H5V3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14 M9 3v18 M15 3v18" />
+      </svg>
+    ),
+    accessories: (
+      <svg className="w-4.5 h-4.5 text-obsidian-velvet/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+      </svg>
+    ),
+    dresses: (
+      <svg className="w-4.5 h-4.5 text-obsidian-velvet/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 3h6l3 7-2 11H8L6 10l3-7z" />
+      </svg>
+    ),
+    footwear: (
+      <svg className="w-4.5 h-4.5 text-obsidian-velvet/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 18h18c-1-5-3-6-7-6h-3L7 16H3v2z" />
+      </svg>
+    ),
   };
 
   const handleAddOne = (item: StagedLookItem) => {
-    if (onOpenSizes) {
-      onOpenSizes(item);
+    const size = selectedSizes[item.id];
+    if (!size) {
+      toast.error(`Please select a size for ${item.title} (or item is out of stock).`);
       return;
     }
+
+    addToBag({
+      id: item.id,
+      sku: item.sku,
+      title: item.title,
+      price: item.price,
+      size,
+      material: "Atelier Sourced Fiber",
+      category: item.category,
+      imageUrl: item.imageUrl,
+    });
+
+    setAddedItems((prev) => ({ ...prev, [item.id]: true }));
+    toast.success(`Added ${item.title} (${size}) to your bag.`);
+    setTimeout(() => {
+      setAddedItems((prev) => ({ ...prev, [item.id]: false }));
+    }, 2000);
   };
 
   const handleAddAll = async () => {
-    if (!onOpenSizes) return;
     setAddingAll(true);
     try {
-      const { firstInStockSize } = await import("@/lib/ai/inventory-utils");
       let addedCount = 0;
       for (const item of look) {
-        const res = await fetch(
-          `/api/inventory?sku=${encodeURIComponent(item.sku)}`
-        );
-        const data = await res.json();
-        if (data.type !== "size_picker") continue;
-        const size = firstInStockSize(
-          data.stockBySize as Record<string, number>,
-          item.sizes
-        );
+        const size = selectedSizes[item.id];
         if (!size) continue;
         addToBag({
           id: item.id,
@@ -991,7 +1085,7 @@ export function OutfitBuilder({
         addedCount += 1;
       }
       if (addedCount === 0) {
-        toast.error("No in-stock sizes found for this look. Pick sizes per piece.");
+        toast.error("Please select available sizes for the pieces.");
         return;
       }
       setAllAdded(true);
@@ -999,7 +1093,7 @@ export function OutfitBuilder({
       toast.success(
         addedCount === look.length
           ? `Complete ${occasion} look added to your bag.`
-          : `${addedCount} of ${look.length} pieces added (in-stock sizes).`,
+          : `${addedCount} of ${look.length} pieces added.`,
         { description: "Open your bag from the header when you're ready." }
       );
     } finally {
@@ -1045,10 +1139,10 @@ export function OutfitBuilder({
           {emptyMessage}
         </p>
       )}
-      {look.length > 0 && onOpenSizes && (
+      {look.length > 0 && (
         <p className="px-5 py-2 font-sans text-[9px] text-obsidian-velvet/40 border-b border-muted-zinc/20">
-          <span className="font-bold uppercase tracking-wide">+</span> pick your size before adding ·{" "}
-          <span className="font-bold uppercase tracking-wide">↻</span> suggest another option for that slot
+          Select size inline & click <span className="font-bold uppercase tracking-wide">+</span> to add item ·{" "}
+          <span className="font-bold uppercase tracking-wide">↻</span> refresh options
         </p>
       )}
 
@@ -1072,8 +1166,8 @@ export function OutfitBuilder({
             <div key={item.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-warm-linen/20 transition-colors group">
               {/* Step number + icon */}
               <div className="w-8 h-8 rounded-full border border-muted-zinc/60 flex items-center justify-center flex-shrink-0 bg-warm-linen/40">
-                <span className="text-[10px] text-obsidian-velvet/40">
-                  {CATEGORY_ICONS[catKey ?? ""] ?? (idx + 1)}
+                <span className="flex items-center justify-center">
+                  {CATEGORY_ICONS[catKey ?? ""] ?? <span className="text-[10px] text-obsidian-velvet/40">{idx + 1}</span>}
                 </span>
               </div>
 
@@ -1097,31 +1191,77 @@ export function OutfitBuilder({
                 <span className="text-[9px] font-bold text-obsidian-velvet/60 mt-0.5 block">
                   ₹{item.price.toLocaleString()}
                 </span>
+
+                {/* Inline size selector buttons */}
+                {loadingSizes[item.id] ? (
+                  <div className="flex gap-1 mt-1.5 items-center">
+                    <span className="w-1 h-1 rounded-full bg-obsidian-velvet/30 animate-pulse" />
+                    <span className="text-[7.5px] text-obsidian-velvet/30 uppercase tracking-widest">Loading...</span>
+                  </div>
+                ) : dbSizes[item.id] && dbSizes[item.id].length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {dbSizes[item.id].map((sz) => {
+                      const isSelected = selectedSizes[item.id] === sz;
+                      return (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => setSelectedSizes((prev) => ({ ...prev, [item.id]: sz }))}
+                          className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-obsidian-velvet text-surface-white border-obsidian-velvet shadow-sm"
+                              : "bg-surface-white text-obsidian-velvet/60 border-muted-zinc/60 hover:border-obsidian-velvet/40"
+                          }`}
+                        >
+                          {sz}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-[8px] text-red-500 uppercase tracking-widest font-semibold block mt-1.5">Out of stock</span>
+                )}
               </div>
 
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 {onSwapItem && (
                   <button
                     type="button"
                     onClick={() => onSwapItem(item)}
                     disabled={swappingSku === item.sku}
                     className="w-7 h-7 rounded-full border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet/45 hover:text-obsidian-velvet flex items-center justify-center text-[10px] cursor-pointer disabled:opacity-40 bg-surface-white"
-                    title="Suggest another option"
+                    data-tooltip-id="outfit-tooltip"
+                    data-tooltip-content="Suggest another option"
                   >
-                    {swappingSku === item.sku ? "…" : "↻"}
+                    {swappingSku === item.sku ? (
+                      <span className="animate-spin text-[8px]">…</span>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                    )}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => handleAddOne(item)}
-                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all cursor-pointer text-[10px] font-bold ${
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
                     isAdded
                       ? "border-emerald-300 bg-emerald-50 text-emerald-600"
                       : "border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet/50 hover:text-obsidian-velvet bg-surface-white"
                   }`}
-                  title="Pick size & add"
+                  data-tooltip-id="outfit-tooltip"
+                  data-tooltip-content={isAdded ? "Added to styling bag" : "Add to styling bag"}
                 >
-                  {isAdded ? "✓" : "+"}
+                  {isAdded ? (
+                    <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
@@ -1150,6 +1290,7 @@ export function OutfitBuilder({
         </button>
       </div>
       )}
+      <Tooltip id="outfit-tooltip" className="z-50" style={{ borderRadius: '6px', fontSize: '10px', padding: '6px 10px' }} />
     </div>
   );
 }

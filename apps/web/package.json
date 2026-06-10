@@ -12,6 +12,7 @@
     "@ai-sdk/google": "^3.0.80",
     "@ai-sdk/groq": "^3.0.39",
     "@ai-sdk/mistral": "^3.0.37",
+    "@ai-sdk/openai": "^3.0.68",
     "@ai-sdk/react": "^3.0.196",
     "@hookform/resolvers": "^5.4.0",
     "@supabase/ssr": "^0.10.3",

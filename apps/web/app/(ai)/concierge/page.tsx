@@ -71,9 +71,9 @@ type ShowcaseState =
 
 const QUICK_PROMPTS = [
   { label: "Quiet Luxury", query: "Show me quiet luxury essentials" },
-  { label: "Summer Dresses", query: "Find light summer dresses under ₹8,000" },
-  { label: "Office Edit", query: "Recommend a polished office wardrobe" },
-  { label: "Wedding Guest", query: "Build a wedding guest outfit for me" },
+  { label: "Summer Dresses", query: "Find summer dresses" },
+  { label: "Office Edit", query: "Recommend an office wardrobe" },
+  { label: "Wedding Guest", query: "Build a wedding guest outfit" },
   { label: "Resort Wear", query: "Stage resort linen coordinates" },
   { label: "Evening Silk", query: "Recommend evening silk combinations" },
 ];
@@ -199,12 +199,25 @@ function getToolResultChip(result: {
   }
 }
 
+function parseMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={i} className="font-bold">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function ConciergePageV2() {
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const [chatId, setChatId] = useState("");
 
@@ -212,9 +225,6 @@ export default function ConciergePageV2() {
     setChatId(crypto.randomUUID());
   }, []);
   const [input, setInput] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [showcase, setShowcase] = useState<ShowcaseState>({ kind: "idle" });
   const showcaseRef = useRef(showcase);
   const [sizePickerLoading, setSizePickerLoading] = useState(false);
@@ -223,6 +233,7 @@ export default function ConciergePageV2() {
   /** While true, showcase stays on local size picker until user taps Back */
   const pinSizePickerRef = useRef(false);
   const pinOutfitShowcaseRef = useRef(false);
+  const lastProcessedToolKeyRef = useRef<string | null>(null);
   const [apiError, setApiError] = useState<"MISSING_API_KEY" | "QUOTA_EXCEEDED" | null>(null);
   const [apiErrorMessage, setApiErrorMessage] = useState<string | null>(null);
 
@@ -443,21 +454,37 @@ export default function ConciergePageV2() {
   // Parse tool results to update showcase panel
   useEffect(() => {
     if (pinSizePickerRef.current) {
-      if (isLoading) return;
       return;
     }
 
     if (pinOutfitShowcaseRef.current) {
-      if (isLoading) return;
       return;
     }
 
-    if (isLoading) {
-      setShowcase({ kind: "thinking" });
+    // If chat is reset/new, revert showcase to idle
+    if (messages.length <= 1) {
+      if (lastProcessedToolKeyRef.current !== null) {
+        lastProcessedToolKeyRef.current = null;
+        setShowcase({ kind: "idle" });
+      }
       return;
     }
 
-    // Find the latest tool result in messages
+    // Check if the latest message has an active tool call in progress
+    const latestMessage = messages[messages.length - 1];
+    const hasActiveToolCall = latestMessage?.parts?.some(
+      (p: any) => (p.type === "dynamic-tool" || p.type?.startsWith("tool-")) && p.state !== "output-available" && p.state !== "done"
+    );
+
+    if (hasActiveToolCall) {
+      if (lastProcessedToolKeyRef.current !== "thinking") {
+        lastProcessedToolKeyRef.current = "thinking";
+        setShowcase({ kind: "thinking" });
+      }
+      return;
+    }
+
+    // Find the latest completed tool result in messages
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       const toolParts = msg.parts?.filter(
@@ -469,6 +496,14 @@ export default function ConciergePageV2() {
         if (part.state !== "output-available" && part.state !== "done") continue;
         const result = part.output;
         if (!result) continue;
+
+        const key = `${msg.id}-${j}`;
+        if (lastProcessedToolKeyRef.current === key) {
+          // Already processed this tool result; do not overwrite showcase state.
+          return;
+        }
+
+        lastProcessedToolKeyRef.current = key;
 
         if (result.type === "product_carousel") {
           setShowcase({
@@ -558,74 +593,23 @@ export default function ConciergePageV2() {
     }
 
     // No tool result found — if was thinking, revert to idle
+    if (lastProcessedToolKeyRef.current !== null) {
+      lastProcessedToolKeyRef.current = null;
+    }
     setShowcase((prev) => prev.kind === "thinking" ? { kind: "idle" } : prev);
-  }, [messages, isLoading]);
+  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text && !imagePreview) return;
+    if (!text) return;
 
-    if (imageFile) {
-      const fileList = new DataTransfer();
-      fileList.items.add(imageFile);
-      const fileParts = await convertFileListToFileUIParts(fileList.files);
-      await sendMessage({
-        text: `[Image Upload] ${text || "Find me products similar to this image — analyze the style, color, and garment type"}`,
-        files: fileParts,
-      });
-      setImageFile(null);
-    } else {
-      await sendUserQuery(text);
-    }
+    await sendUserQuery(text);
     setInput("");
-    setImagePreview(null);
-  };
-
-  const handleImageFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setImagePreview(e.target?.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleImageFile(file);
-  }, []);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!dropZoneRef.current?.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
   };
 
   return (
-    <div
-      ref={dropZoneRef}
-      className="fixed inset-0 bg-warm-linen flex flex-col"
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-    >
-      {/* Global Drag-Over Overlay */}
-      {isDragOver && (
-        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-warm-linen/95 backdrop-blur-sm border-2 border-dashed border-obsidian-velvet/40 transition-all animate-in fade-in duration-150 pointer-events-none">
-          <svg className="w-12 h-12 text-obsidian-velvet/30 mb-4" fill="none" stroke="currentColor" strokeWidth="1" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-          </svg>
-          <p className="font-serif text-xl font-light text-obsidian-velvet/60 tracking-tight">Drop your image here</p>
-          <p className="font-sans text-[9px] font-bold uppercase tracking-widest text-obsidian-velvet/30 mt-1.5">We'll find similar pieces from the catalog</p>
-        </div>
-      )}
+    <div className="fixed inset-0 bg-warm-linen flex flex-col">
 
       {/* API Error Overlay */}
       {apiError && (
@@ -641,8 +625,8 @@ export default function ConciergePageV2() {
             </h2>
             <p className="font-sans text-xs text-obsidian-velvet/60 leading-relaxed mb-4">
               {apiError === "MISSING_API_KEY" 
-                ? "Please configure your Gemini API key in the environment variables to continue using the AI Concierge."
-                : "The Gemini API returned a quota limit or usage error. Please verify your billing/plan configuration in Google AI Studio or Google Cloud Console."}
+                ? "Please configure your API key in the environment variables to continue using the AI Concierge."
+                : "The AI Provider returned a quota limit or usage error. Please verify your billing/plan configuration (e.g. OpenAI billing dashboard, Google AI Studio, or Groq Cloud Console)."}
             </p>
             {apiErrorMessage && (
               <div className="mb-6 p-4 bg-red-50/50 border border-red-100 rounded-xl text-left max-h-[160px] overflow-y-auto">
@@ -679,10 +663,6 @@ export default function ConciergePageV2() {
         </div>
 
         <div className="flex items-center gap-5">
-          <span className="hidden sm:flex items-center gap-1.5 font-sans text-[8px] font-bold tracking-widest uppercase text-obsidian-velvet/30">
-            <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
-            Gemini 2.0 Flash
-          </span>
           <button
             type="button"
             onClick={openBag}
@@ -731,13 +711,13 @@ export default function ConciergePageV2() {
                         {message.role === "assistant" ? "AI Concierge" : "You"}
                       </span>
                       <div
-                        className={`px-4 py-3 rounded-2xl font-sans text-[11.5px] leading-relaxed ${
+                        className={`px-4 py-3 rounded-2xl font-sans text-[11.5px] leading-relaxed whitespace-pre-wrap ${
                           message.role === "assistant"
                             ? "bg-warm-linen/60 text-obsidian-velvet/90 rounded-tl-sm"
                             : "bg-obsidian-velvet text-surface-white rounded-tr-sm ml-auto"
                         }`}
                       >
-                        {text}
+                        {parseMarkdown(text)}
                       </div>
                     </div>
                   )}
@@ -819,58 +799,9 @@ export default function ConciergePageV2() {
             </div>
           </div>
 
-          {/* Image Preview */}
-          {imagePreview && (
-            <div className="flex-shrink-0 px-4 py-2">
-              <div className="relative inline-block">
-                <img
-                  src={imagePreview}
-                  alt="Upload preview"
-                  className="w-16 h-20 object-cover rounded-lg border border-muted-zinc shadow-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImagePreview(null);
-                    setImageFile(null);
-                  }}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-obsidian-velvet text-surface-white rounded-full flex items-center justify-center text-[10px] cursor-pointer hover:bg-obsidian-velvet/80 transition-colors"
-                >
-                  ✕
-                </button>
-                <div className="absolute bottom-0 inset-x-0 bg-obsidian-velvet/70 text-surface-white text-[6px] font-bold uppercase tracking-wider py-0.5 rounded-b-lg text-center">
-                  Visual Search
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Input Area */}
           <div className="flex-shrink-0 border-t border-muted-zinc/60 p-4 bg-surface-white">
             <form onSubmit={handleSubmit} className="flex items-end gap-2">
-              {/* Image Upload Button */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-shrink-0 w-9 h-9 border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet/50 hover:text-obsidian-velvet flex items-center justify-center rounded-xl transition-all cursor-pointer bg-warm-linen/40"
-                title="Upload image for visual search"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-                </svg>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageFile(file);
-                  e.target.value = "";
-                }}
-              />
-
               {/* Text Input */}
               <div className="flex-1 relative">
                 <textarea
@@ -887,7 +818,7 @@ export default function ConciergePageV2() {
                     }
                   }}
                   disabled={!!apiError}
-                  placeholder={apiError ? "API Error: Please resolve" : "Describe what you're looking for... (or drag an image)"}
+                  placeholder={apiError ? "API Error: Please resolve" : "Describe what you're looking for..."}
                   rows={1}
                   className="w-full bg-warm-linen/40 border border-muted-zinc focus:border-obsidian-velvet rounded-xl pl-4 pr-4 py-2.5 text-[11.5px] font-sans text-obsidian-velvet placeholder-obsidian-velvet/30 focus:outline-none transition-all resize-none overflow-hidden leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -896,7 +827,7 @@ export default function ConciergePageV2() {
               {/* Send Button */}
               <button
                 type="submit"
-                disabled={isLoading || (!input.trim() && !imagePreview) || !!apiError}
+                disabled={isLoading || !input.trim() || !!apiError}
                 className="flex-shrink-0 w-9 h-9 bg-obsidian-velvet text-surface-white flex items-center justify-center rounded-xl hover:bg-obsidian-velvet/90 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -905,7 +836,7 @@ export default function ConciergePageV2() {
               </button>
             </form>
             <p className="font-sans text-[7.5px] text-obsidian-velvet/25 uppercase tracking-widest mt-2 text-center">
-              Shift+Enter for new line · Drag image for visual search
+              Shift+Enter for new line
             </p>
           </div>
         </div>
@@ -974,24 +905,6 @@ export default function ConciergePageV2() {
                         </button>
                       ))}
                     </div>
-                  </div>
-                </div>
-
-                {/* Bottom: Image Upload CTA */}
-                <div className="mt-8">
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border border-dashed border-muted-zinc hover:border-obsidian-velvet/50 rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 hover:bg-surface-white/60 group"
-                  >
-                    <svg className="w-7 h-7 text-obsidian-velvet/20 group-hover:text-obsidian-velvet/40 transition-colors mx-auto mb-3" fill="none" stroke="currentColor" strokeWidth="1" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                    </svg>
-                    <p className="font-sans text-[9px] font-bold uppercase tracking-widest text-obsidian-velvet/30 group-hover:text-obsidian-velvet/50 transition-colors">
-                      Drop an image for visual search
-                    </p>
-                    <p className="font-sans text-[8px] text-obsidian-velvet/20 mt-1">
-                      JPG, PNG, WEBP · max 5MB
-                    </p>
                   </div>
                 </div>
               </div>

@@ -23,16 +23,16 @@ import { createClient } from '@/lib/supabase/server'
 const searchSchema = z.object({
   query: z.string().describe('The user\'s search query in natural language'),
   category: z
-    .enum(['dresses', 'tops', 'outerwear', 'trousers', 'accessories'])
+    .string()
     .optional()
     .describe('REQUIRED when user names a product type (e.g. dresses, tops). Results are limited to this category only.'),
-  gender: z.enum(['women', 'men', 'unisex']).optional(),
+  gender: z.string().optional(),
   priceMin: z.number().optional().describe('Minimum price in INR when user says "over ₹X" or "from ₹X".'),
   priceMax: z
     .number()
     .optional()
     .describe('Maximum price in INR when user says "under ₹X", "below ₹X", or "max ₹X". Results never exceed this.'),
-  count: z.number().min(1).max(12).optional().default(6),
+  count: z.number().optional().describe('Number of items to return (default 6)'),
 })
 
 export const searchProductsTool = tool<z.infer<typeof searchSchema>, Awaited<ReturnType<typeof searchProductsExecute>>>({
@@ -45,7 +45,7 @@ export const searchProductsTool = tool<z.infer<typeof searchSchema>, Awaited<Ret
 async function searchProductsExecute(params: z.infer<typeof searchSchema>) {
   const { query, category, gender, priceMin, priceMax, count = 6 } = params
   const filters = mergeSearchFilters(
-    { query, category, gender, priceMin, priceMax },
+    { query, category: category as any, gender: gender as any, priceMin, priceMax },
     parseQueryConstraints(query)
   )
 
@@ -166,7 +166,7 @@ export const getPersonalizedRecsTool = tool({
   description: 'Get personalized product recommendations based on the user\'s style profile.',
   inputSchema: z.object({
     occasion: z.string().optional().describe('Occasion context: "office", "evening", "weekend", "travel"'),
-    count: z.number().min(1).max(8).optional().default(4),
+    count: z.number().optional().describe('Number of items (default 4)'),
   }),
   execute: async (params) => {
     const { occasion, count = 4 } = params
@@ -368,7 +368,7 @@ export const compareProductsTool = tool({
 // ─────────────────────────────────────────────────────────────────────
 const occasionRecSchema = z.object({
   occasion: z.enum(['wedding', 'office', 'vacation', 'date night', 'party', 'casual']).describe('The occasion to recommend items for'),
-  count: z.number().min(1).max(6).optional().default(6),
+  count: z.number().optional().describe('Number of items (default 6)'),
 })
 
 export const recommendByOccasionTool = tool({
@@ -407,7 +407,7 @@ export const recommendByOccasionTool = tool({
 const visualSearchSchema = z.object({
   imageDescription: z.string().describe('Extracted visual description of the uploaded image (e.g. style, color, fabric, category).'),
   gender: z.enum(['women', 'men', 'unisex']).optional(),
-  count: z.number().min(1).max(12).optional().default(6),
+  count: z.number().optional().describe('Number of items (default 6)'),
 })
 
 export const visualSearchTool = tool({

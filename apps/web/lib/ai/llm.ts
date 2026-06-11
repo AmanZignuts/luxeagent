@@ -41,7 +41,7 @@ export function getModel(type: 'chat' | 'vision') {
   const provider = process.env.LLM_PROVIDER || 'groq'
 
   if (provider === 'google') {
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    const modelName = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
     return getGoogleInstance()(modelName)
   } else if (provider === 'openai') {
     if (type === 'chat') {

@@ -55,4 +55,18 @@ body {
   }
 }
 
-
+/* Custom scrollbar utility for scrollbar-thin */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(9, 9, 11, 0.15);
+  border-radius: 2px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(9, 9, 11, 0.3);
+}

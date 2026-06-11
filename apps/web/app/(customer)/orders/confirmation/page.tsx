@@ -58,7 +58,7 @@ export default function OrderConfirmationPage() {
 
         if (orderId) {
           const supabase = createClient();
-          const { data: dbOrder, error } = await supabase
+          const { data: dbOrder } = await supabase
             .from("orders")
             .select("*")
             .eq("id", orderId)
@@ -131,18 +131,6 @@ export default function OrderConfirmationPage() {
     loadOrder();
   }, []);
 
-  const getStatusColor = (status: HistoricalOrder["status"]) => {
-    switch (status) {
-      case "Tailoring in Progress":
-      case "Quality Check":
-        return "text-emerald-700 bg-emerald-50 border border-emerald-200/80";
-      case "Delivered & Archived":
-        return "text-obsidian-velvet/60 bg-zinc-50 border border-zinc-200";
-      case "In Sourcing":
-        return "text-amber-700 bg-amber-50 border border-amber-200";
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
@@ -174,8 +162,6 @@ export default function OrderConfirmationPage() {
   }
 
   const activeOrder = order;
-  const firstItem = activeOrder.items[0];
-  const firstItemTitle = firstItem ? firstItem.title : "Navy Trouser";
 
   return (
     <div className="space-y-10 animate-in fade-in duration-300">

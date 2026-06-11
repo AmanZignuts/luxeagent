@@ -86,6 +86,7 @@ export function buildEmptySearchMessage(
 
 export type StrictCatalogSearchResult = {
   products: HybridSearchResult[]
+  totalFound: number
   empty: boolean
   emptyMessage?: string
   appliedFilters: CatalogSearchFilters
@@ -111,6 +112,7 @@ export async function strictCatalogSearch(
           : null
       return {
         products: [],
+        totalFound: 0,
         empty: true,
         emptyMessage: buildEmptySearchMessage(filters, lowest),
         appliedFilters: filters,
@@ -127,10 +129,12 @@ export async function strictCatalogSearch(
       (p) => scoreQueryRelevance(p, filters.query) > 0
     )
 
-    const products = (withRelevance.length > 0 ? withRelevance : ranked).slice(0, count)
+    const finalCandidates = withRelevance.length > 0 ? withRelevance : ranked
+    const products = finalCandidates.slice(0, count)
 
     return {
       products,
+      totalFound: finalCandidates.length,
       empty: products.length === 0,
       emptyMessage:
         products.length === 0
@@ -149,15 +153,17 @@ export async function strictCatalogSearch(
     priceMax: filters.priceMax,
   })
 
-  const products = hybrid
+  const matchingHybrid = hybrid
     .filter((p) => isTrustedCatalogProduct(p) && productMatchesFilters(p, filters))
-    .slice(0, count)
+  const products = matchingHybrid.slice(0, count)
 
   return {
     products,
+    totalFound: matchingHybrid.length,
     empty: products.length === 0,
     emptyMessage:
       products.length === 0 ? buildEmptySearchMessage(filters, null) : undefined,
     appliedFilters: filters,
   }
 }
+

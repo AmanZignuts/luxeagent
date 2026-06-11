@@ -56,7 +56,7 @@ export function getModel(type: 'chat' | 'vision') {
       const modelName = "llama-3.1-8b-instant"
       return getGroqInstance()(modelName)
     } else {
-      const modelName = process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview'
+      const modelName = process.env.GROQ_VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct'
       return getGroqInstance()(modelName)
     }
   }

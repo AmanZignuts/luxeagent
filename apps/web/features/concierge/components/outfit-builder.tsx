@@ -81,7 +81,7 @@ export function OutfitBuilder({
         })
         .catch((err) => {
           console.error("Failed to load inventory for " + item.sku, err);
-          fetchedIdsRef.current.delete(item.id);
+          setDbSizes((prev) => ({ ...prev, [item.id]: [] }));
         })
         .finally(() => {
           setLoadingSizes((prev) => ({ ...prev, [item.id]: false }));
@@ -256,6 +256,9 @@ export function OutfitBuilder({
         {look.map((item, idx) => {
           const isAdded = addedItems[item.id];
           const catKey = item.category?.toLowerCase().replace(/\s+/g, "");
+          const sizesToRender = dbSizes[item.id] !== undefined ? dbSizes[item.id] : item.sizes;
+          const isSizeLoading = sizesToRender === undefined || loadingSizes[item.id];
+
           return (
             <div key={item.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-warm-linen/20 transition-colors group">
               {/* Step number + icon */}
@@ -287,34 +290,35 @@ export function OutfitBuilder({
                 </span>
 
                 {/* Inline size selector buttons */}
-                {loadingSizes[item.id] ? (
-                  <div className="flex gap-1 mt-1.5 items-center">
-                    <span className="w-1 h-1 rounded-full bg-obsidian-velvet/30 animate-pulse" />
-                    <span className="text-[7.5px] text-obsidian-velvet/30 uppercase tracking-widest">Loading...</span>
-                  </div>
-                ) : dbSizes[item.id] && dbSizes[item.id].length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {dbSizes[item.id].map((sz) => {
-                      const isSelected = selectedSizes[item.id] === sz;
-                      return (
-                        <button
-                          key={sz}
-                          type="button"
-                          onClick={() => setSelectedSizes((prev) => ({ ...prev, [item.id]: sz }))}
-                          className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border transition-all cursor-pointer ${
-                            isSelected
-                              ? "bg-obsidian-velvet text-surface-white border-obsidian-velvet shadow-sm"
-                              : "bg-surface-white text-obsidian-velvet/60 border-muted-zinc/60 hover:border-obsidian-velvet/40"
-                          }`}
-                        >
-                          {sz}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <span className="text-[8px] text-red-500 uppercase tracking-widest font-semibold block mt-1.5">Out of stock</span>
-                )}
+                <div className="h-[18px] mt-1.5 flex items-center">
+                  {isSizeLoading ? null : sizesToRender.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {sizesToRender.map((sz) => {
+                        const currentSelected = selectedSizes[item.id] !== undefined
+                          ? selectedSizes[item.id]
+                          : (sizesToRender && sizesToRender.length > 0 ? sizesToRender[0] : undefined);
+                        const isSelected = currentSelected === sz;
+                        return (
+                          <button
+                            key={sz}
+                            type="button"
+                            disabled={swappingSku === item.sku}
+                            onClick={() => setSelectedSizes((prev) => ({ ...prev, [item.id]: sz }))}
+                            className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border transition-all cursor-pointer h-[18px] flex items-center justify-center min-w-[24px] ${
+                              isSelected
+                                ? "bg-obsidian-velvet text-surface-white border-obsidian-velvet shadow-sm"
+                                : "bg-surface-white text-obsidian-velvet/60 border-muted-zinc/60 hover:border-obsidian-velvet/40"
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {sz}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-[8px] text-red-500 uppercase tracking-widest font-semibold block">Out of stock</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -328,7 +332,10 @@ export function OutfitBuilder({
                     data-tooltip-content="Suggest another option"
                   >
                     {swappingSku === item.sku ? (
-                      <span className="animate-spin text-[8px]">…</span>
+                      <svg className="animate-spin h-3.5 w-3.5 text-obsidian-velvet/60" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
                     ) : (
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />

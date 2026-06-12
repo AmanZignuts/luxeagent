@@ -76,3 +76,10 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(9, 9, 11, 0.15) transparent;
 }
+
+/* Prevent scrollbar flashing and page scrolling during initial loading screen */
+.loading, .loading body {
+  overflow: hidden !important;
+  height: 100vh !important;
+}
+

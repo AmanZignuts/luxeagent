@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { PRODUCTS_WOMEN, PRODUCTS_MEN } from "./constants";
 import {
   LandingHeader,
@@ -13,18 +13,6 @@ import {
 } from "./components";
 
 export default function LandingPage() {
-  const [loaderVisible, setLoaderVisible] = useState(true);
-  const [loaderFading, setLoaderFading] = useState(false);
-
-  useEffect(() => {
-    const timer1 = setTimeout(() => setLoaderFading(true), 2000);
-    const timer2 = setTimeout(() => setLoaderVisible(false), 2800);
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-    };
-  }, []);
-
   return (
     <div className="min-h-screen bg-warm-linen font-sans antialiased text-obsidian-velvet selection:bg-tint-champagne overflow-x-hidden">
       <style>{`
@@ -51,29 +39,6 @@ export default function LandingPage() {
         .scale-108 { transform: scale(1.08); }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
       `}</style>
-
-      {/* ── Cinematic Loader ── */}
-      {loaderVisible && (
-        <div
-          className={`fixed inset-0 z-[100] bg-obsidian-velvet flex flex-col items-center justify-center transition-opacity duration-700 ${
-            loaderFading ? "opacity-0" : "opacity-100"
-          }`}
-        >
-          <div className="flex flex-col items-center space-y-8">
-            <span className="font-serif text-4xl sm:text-5xl font-light tracking-[0.2em] text-surface-white animate-[pulse_2.5s_ease-in-out_infinite]">
-              Vestira
-            </span>
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-px h-16 bg-surface-white/10 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1/2 bg-surface-white/80 animate-[slideDown_1.5s_ease-in-out_infinite]" />
-              </div>
-              <span className="font-sans text-[8px] tracking-[0.4em] uppercase text-surface-white/40">
-                Curating Exhibition
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       <LandingHeader />
       <HeroSection />

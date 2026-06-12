@@ -226,6 +226,14 @@ export default function ConciergePageV2() {
         return;
       }
 
+      // Pre-fetch available sizes for the new item before completing the swap transition
+      const invRes = await fetch(`/api/inventory?sku=${encodeURIComponent(data.item.sku)}`);
+      const invData = await invRes.json();
+      if (invData.type !== "size_picker" || !invData.availableSizes) {
+        throw new Error("Inventory sizes unavailable for this suggestion.");
+      }
+      const availableSizes = invData.availableSizes.map((s: any) => s.size);
+
       setShowcase((prev) => {
         if (prev.kind !== "outfit_builder") return prev;
         const newLook = prev.look.map((i) =>
@@ -238,7 +246,7 @@ export default function ConciergePageV2() {
                 category: data.item.category,
                 imageUrl: data.item.imageUrl,
                 colors: data.item.colors ?? [],
-                sizes: data.item.sizes ?? [],
+                sizes: availableSizes,
                 brand: data.item.brand,
               }
             : i

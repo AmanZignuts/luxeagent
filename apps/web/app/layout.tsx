@@ -3,6 +3,7 @@ import { Playfair_Display, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { Agentation } from "agentation";
+import GlobalLoader from "@/components/GlobalLoader";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -25,10 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="loading">
       <body
         className={`${inter.variable} ${playfair.variable} antialiased`}
       >
+        <GlobalLoader />
         {children}
         <Toaster richColors position="top-right" closeButton />
         {process.env.NODE_ENV === "development" && <Agentation />}

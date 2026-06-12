@@ -368,16 +368,33 @@ export const compareProductsTool = tool({
 // TOOL 9: recommendByOccasion
 // ─────────────────────────────────────────────────────────────────────
 const occasionRecSchema = z.object({
-  occasion: z.enum(['wedding', 'office', 'vacation', 'date night', 'party', 'casual']).describe('The occasion to recommend items for'),
+  occasion: z
+    .string()
+    .describe(
+      'The occasion to recommend items for. Must be one of: wedding, office, vacation, date night, party, casual. Use the closest match for synonyms (e.g. "gala" → "wedding", "evening" → "date night", "weekend" → "casual", "travel" → "vacation").'
+    ),
   count: z.number().optional().describe('Number of items (default 6)'),
 })
+
+/** Normalize free-text occasion synonyms to a valid OccasionKey. */
+function normalizeOccasion(raw: string): OccasionKey {
+  const val = raw.toLowerCase().trim()
+  if (val === 'wedding' || val === 'gala' || val === 'formal' || val === 'bridal' || val === 'ceremony') return 'wedding'
+  if (val === 'office' || val === 'work' || val === 'business' || val === 'corporate' || val === 'professional') return 'office'
+  if (val === 'vacation' || val === 'travel' || val === 'beach' || val === 'resort' || val === 'holiday') return 'vacation'
+  if (val === 'date night' || val === 'date' || val === 'evening' || val === 'dinner' || val === 'romantic') return 'date night'
+  if (val === 'party' || val === 'celebration' || val === 'cocktail' || val === 'festive' || val === 'night out') return 'party'
+  // Default: casual covers weekend, brunch, everyday, etc.
+  return 'casual'
+}
 
 export const recommendByOccasionTool = tool({
   description:
     'Recommend products for a named occasion (wedding, office, vacation, date night, party, casual). Use when the user frames an event/occasion — NOT for generic catalog browse (use searchProducts). Same product grid UI with occasion header.',
   inputSchema: occasionRecSchema,
   execute: async (params) => {
-    const { occasion, count = 6 } = params
+    const { occasion: rawOccasion, count = 6 } = params
+    const occasion = normalizeOccasion(rawOccasion)
     const results = await searchForOccasion(occasion as OccasionKey, count)
 
     return {

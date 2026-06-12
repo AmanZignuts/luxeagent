@@ -42,21 +42,31 @@ export function getModel(type: 'chat' | 'vision') {
 
   if (provider === 'google') {
     const modelName = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
+    console.log(`[llm] Provider: google | Model: ${modelName} | Type: ${type}`)
     return getGoogleInstance()(modelName)
   } else if (provider === 'openai') {
     if (type === 'chat') {
       const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+      console.log(`[llm] Provider: openai | Model: ${modelName} | Type: ${type}`)
       return getOpenAIInstance()(modelName)
     } else {
       const modelName = process.env.OPENAI_VISION_MODEL || 'gpt-4o'
+      console.log(`[llm] Provider: openai | Model: ${modelName} | Type: ${type}`)
       return getOpenAIInstance()(modelName)
     }
   } else {
+    // ── Groq (default fallback) ──
+    // NOTE: Free tier is capped at 6,000 TPM on llama-3.1-8b-instant.
+    // This smaller model also has weaker tool-call schema adherence vs Gemini.
+    // Commented out chat model override — set GROQ_CHAT_MODEL in env to change.
     if (type === 'chat') {
-      const modelName = "llama-3.1-8b-instant"
+      const modelName = process.env.GROQ_CHAT_MODEL || 'llama-3.1-8b-instant'
+      // const modelName = 'llama-3.3-70b-versatile' // ← uncomment for better quality on Groq
+      console.log(`[llm] Provider: groq | Model: ${modelName} | Type: ${type}`)
       return getGroqInstance()(modelName)
     } else {
       const modelName = process.env.GROQ_VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct'
+      console.log(`[llm] Provider: groq | Model: ${modelName} | Type: ${type}`)
       return getGroqInstance()(modelName)
     }
   }

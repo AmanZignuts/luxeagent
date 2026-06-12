@@ -43,7 +43,7 @@ export function getModel(type: 'chat' | 'vision') {
   }
 
   // Default: Google Gemini
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const modelName = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
   console.log(`[llm] Provider: google | Model: ${modelName} | Type: ${type}`)
   return getGoogleInstance()(modelName)
 }

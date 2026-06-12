@@ -376,28 +376,7 @@ export function ShowcaseProductGrid({
         </div>
       )}
 
-      {variant === "catalog" && totalFound !== undefined && totalFound > products.length && (
-        <div className="pt-2">
-          <Link
-            href={(() => {
-              const params = new URLSearchParams();
-              if (query) params.set("q", query);
-              if (appliedFilters) {
-                if (appliedFilters.category) params.set("cat", appliedFilters.category);
-                if (appliedFilters.priceMin !== undefined && appliedFilters.priceMin !== null) params.set("priceMin", String(appliedFilters.priceMin));
-                if (appliedFilters.priceMax !== undefined && appliedFilters.priceMax !== null) params.set("priceMax", String(appliedFilters.priceMax));
-                if (appliedFilters.gender) params.set("gender", appliedFilters.gender);
-              }
-              return `/shop/catalog?${params.toString()}`;
-            })()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet/55 hover:text-obsidian-velvet font-sans font-bold text-[8px] uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all cursor-pointer bg-surface-white/60 hover:shadow-sm"
-          >
-            See More in Catalog ({totalFound - products.length} more pieces)
-          </Link>
-        </div>
-      )}
+
 
       {variant === "occasion" && occasion && (
         <button

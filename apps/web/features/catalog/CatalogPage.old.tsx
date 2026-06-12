@@ -3,7 +3,6 @@
 import React, { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 
 interface Product {
@@ -60,14 +59,9 @@ const STATIC_CATALOG: Product[] = [
 
 const ProductCard = React.memo(({ product }: { product: Product }) => {
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 15 }}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.3 }}
-      className="w-full flex"
+    <div className="w-full flex group/card" style={{ transition: "transform 0.2s ease" }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(0)"; }}
     >
       <Link
         href={`/pdp/${product.id}`}
@@ -124,10 +118,30 @@ const ProductCard = React.memo(({ product }: { product: Product }) => {
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 });
 ProductCard.displayName = "ProductCard";
+
+// Skeleton card shown while loading products
+const ProductCardSkeleton = () => (
+  <div className="w-full flex">
+    <div className="bg-surface-white border border-muted-zinc rounded-xl flex flex-row gap-4 p-4 h-36 items-center sm:flex-col sm:h-[400px] sm:p-6 w-full animate-pulse">
+      {/* Image placeholder */}
+      <div className="bg-muted-zinc/30 rounded-lg h-28 w-28 shrink-0 sm:w-full sm:flex-1 sm:min-h-[180px]" />
+      {/* Text placeholders */}
+      <div className="flex-1 min-w-0 flex flex-col justify-between h-full sm:h-auto sm:w-full space-y-2">
+        <div className="space-y-2">
+          <div className="h-2 bg-muted-zinc/30 rounded w-3/4" />
+          <div className="h-3.5 bg-muted-zinc/40 rounded w-full" />
+          <div className="h-2 bg-muted-zinc/20 rounded w-1/2" />
+          <div className="hidden sm:block h-5 bg-muted-zinc/20 rounded w-24 mt-2" />
+        </div>
+        <div className="h-4 bg-muted-zinc/30 rounded w-16" />
+      </div>
+    </div>
+  </div>
+);
 
 const CATALOG_STOP_WORDS = new Set([
   "find", "show", "me", "the", "a", "an", "for", "and", "with", "under", "below",
@@ -193,9 +207,12 @@ function CatalogListingContent() {
     return searchParams.get("gender");
   }, [searchParams]);
   // Autocomplete Search States
-  const [searchQueryInput, setSearchQueryInput] = useState(searchQuery);
+  // searchQueryInput = live typing value (for dropdown suggestions only)
+  // searchQuery (from URL) = what actually filters the product grid
+  const [searchQueryInput, setSearchQueryInput] = useState(rawSearchQuery);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<Product[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
 
   // Mobile Filter Drawer States
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -232,7 +249,7 @@ function CatalogListingContent() {
               sku: p.sku,
               title: p.title,
               price: Number(p.price) || 0,
-              material: p.material_composition || "Selected Fiber",
+              material: p.material_composition || "",
               category: p.category ? capitalize(p.category) : "Ready-to-Wear",
               rawCategory: p.category || "",
               imageUrl: (p.image_urls && p.image_urls.length > 0) ? p.image_urls[0] : "/product_overshirt.png",
@@ -275,26 +292,26 @@ function CatalogListingContent() {
     fetchFilterOptions();
   }, []);
 
-  // 2. Debounce search query updates and sync with URL
+  // Sync input when URL changes externally (back/forward navigation or external link)
+  // Always reflect what's in the URL — clears stale typed-but-uncommitted values
   useEffect(() => {
-    const handler = setTimeout(() => {
-      if (searchQueryInput !== searchQuery) {
-        const params = new URLSearchParams(searchParams.toString());
-        if (searchQueryInput) {
-          params.set("q", searchQueryInput);
-        } else {
-          params.delete("q");
-        }
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-      }
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [searchQueryInput, searchQuery, pathname, router, searchParams]);
+    setSearchQueryInput(rawSearchQuery);
+    // Also close any open dropdown when returning to this page
+    setAutocompleteSuggestions([]);
+    setIsSearchFocused(false);
+    setActiveSuggestionIndex(-1);
+  }, [rawSearchQuery, pathname]);
 
-  // Sync external URL changes back to local input state
-  useEffect(() => {
-    setSearchQueryInput(searchQuery);
-  }, [searchQuery]);
+  // Helper: commit the current input value to the URL (which triggers grid filter)
+  const commitSearchToUrl = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value.trim()) {
+      params.set("q", value.trim());
+    } else {
+      params.delete("q");
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   // 4. Client-side autocomplete suggestions
   useEffect(() => {
@@ -304,19 +321,34 @@ function CatalogListingContent() {
     }
 
     const handler = setTimeout(() => {
-      const query = searchQueryInput.toLowerCase();
+      const query = searchQueryInput.toLowerCase().trim();
+      if (!query) {
+        setAutocompleteSuggestions([]);
+        return;
+      }
       const sourceList = isDbEmpty ? STATIC_CATALOG : allDbProducts;
-      const suggestions = sourceList.filter(
-        (p) =>
-          p.title.toLowerCase().includes(query) ||
-          p.sku.toLowerCase().includes(query) ||
-          p.material.toLowerCase().includes(query)
-      );
+      const suggestions = sourceList.filter((p) => {
+        // Match on title, SKU, category, tags, description — NOT the material fallback
+        if (p.title.toLowerCase().includes(query)) return true;
+        if (p.sku.toLowerCase().includes(query)) return true;
+        if (p.category.toLowerCase().includes(query)) return true;
+        if (p.rawCategory && p.rawCategory.toLowerCase().includes(query)) return true;
+        if (p.description && p.description.toLowerCase().includes(query)) return true;
+        if (p.tags && p.tags.some((tag) => tag.toLowerCase().includes(query))) return true;
+        // Only match material if it's a non-empty real value
+        if (p.material && p.material.trim().length > 0 && p.material.toLowerCase().includes(query)) return true;
+        return false;
+      });
       setAutocompleteSuggestions(suggestions.slice(0, 5));
     }, 250);
 
     return () => clearTimeout(handler);
   }, [searchQueryInput, allDbProducts, isDbEmpty]);
+
+  // Reset active suggestion index when suggestions or input changes
+  useEffect(() => {
+    setActiveSuggestionIndex(-1);
+  }, [searchQueryInput, autocompleteSuggestions]);
 
   // Sync active filters to pending filters when opening the drawer
   useEffect(() => {
@@ -374,6 +406,43 @@ function CatalogListingContent() {
     setPendingSizes([]);
     setPendingInStockOnly(false);
     router.replace(pathname, { scroll: false });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (autocompleteSuggestions.length > 0) {
+        setActiveSuggestionIndex((prevIndex) =>
+          prevIndex < autocompleteSuggestions.length - 1 ? prevIndex + 1 : 0
+        );
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (autocompleteSuggestions.length > 0) {
+        setActiveSuggestionIndex((prevIndex) =>
+          prevIndex > 0 ? prevIndex - 1 : autocompleteSuggestions.length - 1
+        );
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < autocompleteSuggestions.length) {
+        // Commit the typed query to URL first so back-navigation restores it
+        const selectedItem = autocompleteSuggestions[activeSuggestionIndex];
+        commitSearchToUrl(searchQueryInput);
+        router.push(`/pdp/${selectedItem.id}`);
+      } else {
+        // Commit typed text to URL → filters the grid
+        commitSearchToUrl(searchQueryInput);
+      }
+      setIsSearchFocused(false);
+      setAutocompleteSuggestions([]);
+      e.currentTarget.blur();
+    } else if (e.key === "Escape") {
+      // Dismiss dropdown without filtering
+      setIsSearchFocused(false);
+      setAutocompleteSuggestions([]);
+      e.currentTarget.blur();
+    }
   };
 
 
@@ -554,23 +623,75 @@ function CatalogListingContent() {
 
             {/* Autocomplete Search input */}
             <div className="flex-1 min-w-0 max-w-[200px] sm:max-w-xs relative z-40">
-              <input
-                type="text"
-                placeholder="Search catalog..."
-                value={searchQueryInput}
-                onChange={(e) => setSearchQueryInput(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                className="w-full bg-surface-white border border-muted-zinc rounded-md px-3 py-2 text-xs font-sans text-obsidian-velvet placeholder-obsidian-velvet/40 focus:outline-none focus:border-obsidian-velvet transition-colors"
-              />
-              {/* Autocomplete Suggestions Dropdown */}
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  placeholder="Search… press Enter to filter"
+                  value={searchQueryInput}
+                  onChange={(e) => setSearchQueryInput(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                  onKeyDown={handleKeyDown}
+                  className="w-full bg-surface-white border border-muted-zinc rounded-md pl-3 pr-16 py-2 text-xs font-sans text-obsidian-velvet placeholder-obsidian-velvet/40 focus:outline-none focus:border-obsidian-velvet transition-colors"
+                />
+                <div className="absolute right-1 flex items-center gap-1">
+                  {/* Clear button — only shown when a search is actively filtering the grid */}
+                  {rawSearchQuery && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearchQueryInput("");
+                        commitSearchToUrl("");
+                        setAutocompleteSuggestions([]);
+                      }}
+                      className="w-5 h-5 flex items-center justify-center text-obsidian-velvet/40 hover:text-obsidian-velvet transition-colors rounded"
+                      title="Clear search filter"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                  {/* Enter key hint / submit button */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      commitSearchToUrl(searchQueryInput);
+                      setIsSearchFocused(false);
+                      setAutocompleteSuggestions([]);
+                    }}
+                    className="h-6 px-1.5 flex items-center justify-center bg-obsidian-velvet/8 hover:bg-obsidian-velvet/15 rounded text-obsidian-velvet/50 hover:text-obsidian-velvet transition-colors border border-muted-zinc/40"
+                    title="Search (Enter)"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-6-6m0 0A7 7 0 1 0 9 3a7 7 0 0 0 6 12Z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Suggestions Dropdown — quick navigation to PDP, does NOT filter the grid */}
               {isSearchFocused && autocompleteSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 mt-1 bg-surface-white border border-muted-zinc shadow-lg rounded-md z-50 overflow-hidden max-h-60 overflow-y-auto">
-                  {autocompleteSuggestions.map((item) => (
+                  <div className="px-3 py-1.5 border-b border-muted-zinc/20 flex items-center justify-between">
+                    <span className="font-sans text-[8px] uppercase tracking-widest text-obsidian-velvet/35 font-bold">Quick Navigate</span>
+                    <span className="font-sans text-[8px] text-obsidian-velvet/30">Press Enter to filter catalog</span>
+                  </div>
+                  {autocompleteSuggestions.map((item, idx) => (
                     <Link
                       key={item.id}
                       href={`/pdp/${item.id}`}
-                      className="flex items-center gap-3 px-3 py-2 hover:bg-tint-champagne/40 transition-colors border-b border-muted-zinc/10 last:border-none"
+                      onClick={() => {
+                        // Commit typed query to URL before navigating so back-nav restores it
+                        commitSearchToUrl(searchQueryInput);
+                      }}
+                      className={`flex items-center gap-3 px-3 py-2 transition-colors border-b border-muted-zinc/10 last:border-none ${
+                        idx === activeSuggestionIndex
+                          ? "bg-tint-champagne/70 font-semibold"
+                          : "hover:bg-tint-champagne/40"
+                      }`}
                     >
                       <img
                         src={item.imageUrl}
@@ -582,7 +703,7 @@ function CatalogListingContent() {
                           {item.title}
                         </p>
                         <p className="font-sans text-[8px] text-obsidian-velvet/50 uppercase tracking-wider truncate">
-                          {item.sku} — {item.material}
+                          {item.sku}{item.material ? ` — ${item.material}` : ""}
                         </p>
                       </div>
                       <span className="font-sans text-[10px] font-bold text-obsidian-velvet shrink-0">
@@ -680,11 +801,10 @@ function CatalogListingContent() {
         <section className="col-span-12 lg:col-span-9 pb-20">
           
           {loadingProducts ? (
-            <div className="min-h-[40vh] flex flex-col items-center justify-center space-y-4">
-              <div className="w-8 h-8 rounded-full border-[1.5px] border-muted-zinc border-t-obsidian-velvet animate-spin" />
-              <span className="font-serif text-sm text-obsidian-velvet/40 tracking-wider uppercase animate-pulse">
-                Calibrating Selection...
-              </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
             </div>
           ) : finalDisplayProducts.length === 0 ? (
             <div className="border border-dashed border-muted-zinc rounded-xl p-16 text-center bg-surface-white/40">
@@ -697,11 +817,9 @@ function CatalogListingContent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <AnimatePresence mode="popLayout">
-                {finalDisplayProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </AnimatePresence>
+              {finalDisplayProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
             </div>
           )}
 

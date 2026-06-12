@@ -353,7 +353,9 @@ function CheckoutPageContent() {
 
       setTimeout(() => {
         setIsAuthorizing(false);
-        clearBag();
+        if (!isBuyNow) {
+          clearBag();
+        }
         toast.success("Order authorized successfully!");
         if (newOrderId) {
           router.push(`/orders/confirmation?orderId=${newOrderId}`);

@@ -739,6 +739,83 @@ export const getProductDetailsTool = tool({
 })
 
 // ─────────────────────────────────────────────────────────────────────
+// TOOL 12: getCatalogCount  (intent-classified inventory counts)
+// ─────────────────────────────────────────────────────────────────────
+const catalogCountSchema = z.object({
+  query: z.string().optional().describe('Natural-language keyword filter (e.g. "silk", "blue saree", "sale")'),
+  category: z.string().optional().describe('Category filter: tops, dresses, trousers, outerwear, accessories, etc.'),
+  gender: z.string().optional().describe('Gender filter: women, men, unisex'),
+  priceMin: z.number().optional().describe('Minimum price in INR'),
+  priceMax: z.number().optional().describe('Maximum price in INR'),
+})
+
+export const getCatalogCountTool = tool({
+  description:
+    'Count how many products match specific discovery filters (category, price range, keyword). ' +
+    'Use ONLY for discovery-intent count queries like "how many blue dresses do you have?", ' +
+    '"how many items under ₹2,000?", or "how many sarees are on sale?". ' +
+    'NEVER use for abstract totals like "how many pieces in your store?" or "what is your SKU count?" — those must be deflected. ' +
+    'After returning the count, immediately call searchProducts to show the matching products.',
+  inputSchema: catalogCountSchema,
+  execute: async (params) => {
+    const { query, category, gender, priceMin, priceMax } = params
+    const supabase = await createClient()
+
+    // Build count query with all applicable filters
+    let q = supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+
+    if (category) {
+      q = (q as any).ilike('category', `%${category}%`)
+    }
+    if (gender) {
+      q = (q as any).ilike('gender', `%${gender}%`)
+    }
+    if (priceMin !== undefined) {
+      q = (q as any).gte('price', priceMin)
+    }
+    if (priceMax !== undefined) {
+      q = (q as any).lte('price', priceMax)
+    }
+    if (query) {
+      // Keyword filter: search title, description, tags
+      q = (q as any).or(
+        `title.ilike.%${query}%,description.ilike.%${query}%,tags.cs.{"${query}"}`
+      )
+    }
+
+    const { count, error } = await q
+
+    // Build a human-readable label from the applied filters
+    const labelParts: string[] = []
+    if (query) labelParts.push(query)
+    if (category) labelParts.push(category)
+    if (gender) labelParts.push(`(${gender})`)
+    if (priceMin !== undefined && priceMax !== undefined) {
+      labelParts.push(`₹${priceMin}–₹${priceMax}`)
+    } else if (priceMax !== undefined) {
+      labelParts.push(`under ₹${priceMax}`)
+    } else if (priceMin !== undefined) {
+      labelParts.push(`over ₹${priceMin}`)
+    }
+    const label = labelParts.join(' ') || 'products'
+
+    if (error) {
+      console.error('[getCatalogCount] Supabase error:', error)
+      return { type: 'catalog_count' as const, count: 0, label, error: error.message }
+    }
+
+    return {
+      type: 'catalog_count' as const,
+      count: count ?? 0,
+      label,
+    }
+  },
+})
+
+// ─────────────────────────────────────────────────────────────────────
 // Export stopWhen helper for chat route (replaces maxSteps)
 // ─────────────────────────────────────────────────────────────────────
 export { stepCountIs }
@@ -755,6 +832,7 @@ export const agentTools = {
   recommendByOccasion: recommendByOccasionTool,
   findSimilarProducts: visualSearchTool,
   getProductDetails: getProductDetailsTool,
+  getCatalogCount: getCatalogCountTool,
 } as const
 
 export type AgentToolName = keyof typeof agentTools

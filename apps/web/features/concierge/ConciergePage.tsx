@@ -292,29 +292,51 @@ export default function ConciergePageV2() {
         (p: any) => p.type === "dynamic-tool" || p.type?.startsWith("tool-")
       ) || [];
 
+      // Collect ALL completed product_carousel results from this message
+      // so that multiple catalog_search calls in the same turn are merged.
+      const carouselParts = toolParts.filter((p: any) => {
+        if (p.state !== "output-available" && p.state !== "done") return false;
+        return p.output?.type === "product_carousel";
+      });
+
+      if (carouselParts.length > 0) {
+        // Use the index of the last carousel part as the dedup key
+        const lastCarouselIdx = toolParts.lastIndexOf(carouselParts[carouselParts.length - 1]);
+        const key = `${msg.id}-${lastCarouselIdx}`;
+        if (lastProcessedToolKeyRef.current === key) return;
+        lastProcessedToolKeyRef.current = key;
+
+        // Merge all carousel products and sum totalFound
+        const mergedProducts = carouselParts.flatMap((p: any) => p.output.products ?? []);
+        const mergedTotalFound = carouselParts.reduce(
+          (sum: number, p: any) => sum + (p.output.totalFound ?? (p.output.products?.length ?? 0)),
+          0
+        );
+        const firstResult = carouselParts[0].output;
+
+        setShowcase({
+          kind: "product_carousel",
+          products: mergedProducts,
+          query: firstResult.query,
+          emptyMessage: firstResult.emptyMessage,
+          appliedFiltersLabel: carouselParts.length > 1 ? undefined : firstResult.appliedFilters?.label,
+          totalFound: mergedTotalFound,
+          appliedFilters: firstResult.appliedFilters,
+        });
+        return;
+      }
+
       for (let j = toolParts.length - 1; j >= 0; j--) {
         const part = toolParts[j] as any;
         if (part.state !== "output-available" && part.state !== "done") continue;
         const result = part.output;
         if (!result) continue;
+        if (result.type === "product_carousel") continue; // already handled above
 
         const key = `${msg.id}-${j}`;
         if (lastProcessedToolKeyRef.current === key) return;
 
         lastProcessedToolKeyRef.current = key;
-
-        if (result.type === "product_carousel") {
-          setShowcase({
-            kind: "product_carousel",
-            products: result.products ?? [],
-            query: result.query,
-            emptyMessage: result.emptyMessage,
-            appliedFiltersLabel: result.appliedFilters?.label,
-            totalFound: result.totalFound,
-            appliedFilters: result.appliedFilters,
-          });
-          return;
-        }
         if (result.type === "personalized_carousel") {
           setShowcase({ kind: "personalized_carousel", products: result.products });
           return;

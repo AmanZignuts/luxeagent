@@ -373,7 +373,7 @@ const occasionRecSchema = z.object({
     .describe(
       'The occasion to recommend items for. Must be one of: wedding, office, vacation, date night, party, casual. Use the closest match for synonyms (e.g. "gala" → "wedding", "evening" → "date night", "weekend" → "casual", "travel" → "vacation").'
     ),
-  count: z.number().optional().describe('Number of items (default 6)'),
+  count: z.coerce.number().optional().describe('Number of items (default 6)'),
 })
 
 /** Normalize free-text occasion synonyms to a valid OccasionKey. */

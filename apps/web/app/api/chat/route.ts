@@ -137,14 +137,11 @@ export async function POST(request: Request) {
       return runMockAgent(userQuery, chatId, messages)
     }
 
-    const provider = process.env.LLM_PROVIDER || 'groq'
+    const provider = process.env.LLM_PROVIDER || 'google'
     let hasApiKey = false
-    let providerName = 'Groq'
+    let providerName = 'Gemini'
 
-    if (provider === 'groq') {
-      hasApiKey = !!process.env.GROQ_API_KEY
-      providerName = 'Groq'
-    } else if (provider === 'openai') {
+    if (provider === 'openai') {
       hasApiKey = !!process.env.OPENAI_API_KEY
       providerName = 'OpenAI'
     } else {
@@ -200,11 +197,6 @@ export async function POST(request: Request) {
         tools: agentTools,
         stopWhen: stepCountIs(5),
         maxRetries: 0,
-        providerOptions: {
-          groq: {
-            parallelToolCalls: false,
-          },
-        },
       })
 
       return result.toUIMessageStreamResponse({

@@ -312,7 +312,7 @@ export default function ConciergePageV2() {
           (sum: number, p: any) => sum + (p.output.totalFound ?? (p.output.products?.length ?? 0)),
           0
         );
-        const firstResult = carouselParts[0].output;
+        const firstResult = (carouselParts[0] as any).output;
 
         setShowcase({
           kind: "product_carousel",

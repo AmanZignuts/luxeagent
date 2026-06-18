@@ -1,4 +1,4 @@
--- Migration 002: Core tables for LuxeAgent
+-- Migration 002: Core tables for Vestira Concierge
 
 -- ============================================================
 -- PRODUCTS TABLE

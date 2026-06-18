@@ -1,5 +1,6 @@
 import React, { FormEvent, RefObject } from "react";
 import { QUICK_PROMPTS } from "../types";
+import { Textarea } from "@/components/ui";
 
 function getToolResultChip(result: {
   type: string;
@@ -353,7 +354,7 @@ export function ChatPanel({
 
           {/* Text Input */}
           <div className="flex-1 relative">
-            <textarea
+            <Textarea
               ref={textareaRef}
               value={input}
               maxLength={500}
@@ -367,7 +368,7 @@ export function ChatPanel({
               disabled={!!apiError}
               placeholder={apiError ? "API Error: Please resolve" : "Describe what you're looking for... (or drag an image)"}
               rows={1}
-              className="w-full bg-warm-linen/40 border border-muted-zinc focus:border-obsidian-velvet rounded-xl pl-4 pr-4 py-2.5 text-[11.5px] font-sans text-obsidian-velvet placeholder-obsidian-velvet/30 focus:outline-none transition-all resize-none overflow-hidden scrollbar-thin leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
+              className="border-muted-zinc focus:border-obsidian-velvet rounded-xl py-2.5 text-[11.5px] resize-none overflow-hidden scrollbar-thin leading-relaxed"
             />
           </div>
 

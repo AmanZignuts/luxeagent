@@ -70,7 +70,7 @@ async function fetchImageFingerprint(url: string): Promise<number[] | null> {
 
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'LuxeAgent-VisualSearch/1.0' },
+      headers: { 'User-Agent': 'VestiraConcierge-VisualSearch/1.0' },
     })
     clearTimeout(timeout)
 

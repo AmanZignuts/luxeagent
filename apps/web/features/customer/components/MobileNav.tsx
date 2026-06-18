@@ -8,9 +8,10 @@ interface MobileNavProps {
   isLoggedIn: boolean;
   onSignOut: (e: React.MouseEvent) => void;
   onSignIn: () => void;
+  onProtectedNavigation?: (targetPath: string) => void;
 }
 
-export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn }: MobileNavProps) {
+export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn, onProtectedNavigation }: MobileNavProps) {
   const pathname = usePathname();
 
   if (!isOpen) return null;
@@ -58,7 +59,13 @@ export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn }: 
             </Link>
             <Link
               href="/profile"
-              onClick={onClose}
+              onClick={(e) => {
+                onClose();
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  onProtectedNavigation?.("/profile");
+                }
+              }}
               className={`hover:text-obsidian-velvet transition-colors pb-1 ${
                 pathname === "/profile" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
               }`}
@@ -67,7 +74,13 @@ export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn }: 
             </Link>
             <Link
               href="/orders"
-              onClick={onClose}
+              onClick={(e) => {
+                onClose();
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  onProtectedNavigation?.("/orders");
+                }
+              }}
               className={`hover:text-obsidian-velvet transition-colors pb-1 ${
                 pathname === "/orders" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
               }`}
@@ -76,7 +89,13 @@ export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn }: 
             </Link>
             <Link
               href="/concierge"
-              onClick={onClose}
+              onClick={(e) => {
+                onClose();
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  onProtectedNavigation?.("/concierge");
+                }
+              }}
               className="hover:text-amber-600 transition-colors font-bold pb-1 text-amber-600/80 text-[12px] uppercase tracking-widest"
             >
               ✦ AI Concierge

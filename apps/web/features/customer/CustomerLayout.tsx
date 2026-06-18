@@ -81,6 +81,22 @@ function CustomerLayoutContent({ children }: { children: React.ReactNode }) {
     };
   }, [setIsBagDrawerOpen]);
 
+  // Listener to open Auth Modal dynamically from children (e.g. PDP Buy Now)
+  useEffect(() => {
+    const handleOpenAuth = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.pendingAction) {
+        setPendingAction(() => customEvent.detail.pendingAction);
+      }
+      setAuthTab("signin");
+      setIsAuthModalOpen(true);
+    };
+    window.addEventListener("open-auth", handleOpenAuth);
+    return () => {
+      window.removeEventListener("open-auth", handleOpenAuth);
+    };
+  }, []);
+
   // Lock body scroll when any drawer is open
   useEffect(() => {
     if (isAiOpen || isBagDrawerOpen) {
@@ -121,6 +137,12 @@ function CustomerLayoutContent({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleProtectedNavigation = (targetPath: string) => {
+    setPendingAction(() => () => router.push(targetPath));
+    setAuthTab("signin");
+    setIsAuthModalOpen(true);
+  };
+
   const toggleBagDrawer = (open: boolean) => {
     if (open) setIsAiOpen(false); // Close AI drawer if opening Bag
     setIsBagDrawerOpen(open);
@@ -137,6 +159,7 @@ function CustomerLayoutContent({ children }: { children: React.ReactNode }) {
         }}
         onSignOut={handleSignOutClick}
         onToggleBag={toggleBagDrawer}
+        onProtectedNavigation={handleProtectedNavigation}
       />
 
       <main className="max-w-7xl mx-auto px-6 sm:px-8 pt-24 pb-16 relative z-10">
@@ -164,6 +187,7 @@ function CustomerLayoutContent({ children }: { children: React.ReactNode }) {
           setAuthTab("signin");
           setIsAuthModalOpen(true);
         }}
+        onProtectedNavigation={handleProtectedNavigation}
       />
 
       <ProductOverviewModal

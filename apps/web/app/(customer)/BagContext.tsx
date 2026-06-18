@@ -51,19 +51,52 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // When userId changes, load the corresponding bag from localStorage
+  // When userId changes, load and merge the corresponding bag from localStorage
   useEffect(() => {
     setIsInitialized(false);
     try {
-      const key = userId ? `vestira_bag_${userId}` : "vestira_bag_guest";
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        setBagItems(JSON.parse(stored));
+      const guestKey = "vestira_bag_guest";
+      const userKey = userId ? `vestira_bag_${userId}` : null;
+
+      if (userId) {
+        // Guest logged in! Merge the guest bag into the user's bag.
+        const storedUser = localStorage.getItem(userKey!);
+        const storedGuest = localStorage.getItem(guestKey);
+
+        const userItems: BagItem[] = storedUser ? JSON.parse(storedUser) : [];
+        const guestItems: BagItem[] = storedGuest ? JSON.parse(storedGuest) : [];
+
+        if (guestItems.length > 0) {
+          // Deep clone userItems to modify
+          const merged = [...userItems];
+          guestItems.forEach((gItem) => {
+            const matchIndex = merged.findIndex(
+              (uItem) => uItem.id === gItem.id && uItem.size === gItem.size
+            );
+            if (matchIndex > -1) {
+              merged[matchIndex] = {
+                ...merged[matchIndex],
+                quantity: (merged[matchIndex].quantity || 1) + (gItem.quantity || 1),
+              };
+            } else {
+              merged.push(gItem);
+            }
+          });
+
+          // Save the merged bag to user local storage and clear the guest bag
+          localStorage.setItem(userKey!, JSON.stringify(merged));
+          localStorage.removeItem(guestKey);
+          setBagItems(merged);
+        } else {
+          setBagItems(userItems);
+        }
       } else {
-        setBagItems([]);
+        // Logged out or initial load as guest
+        const stored = localStorage.getItem(guestKey);
+        setBagItems(stored ? JSON.parse(stored) : []);
       }
     } catch (e) {
-      console.error("Failed to load bag from localStorage:", e);
+      console.error("Failed to load or merge bag from localStorage:", e);
       setBagItems([]);
     }
     setIsInitialized(true);

@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Modal } from "@/components/ui/modal";
-import { Button } from "@/components/ui/button";
+import { Modal, Button, Combobox, Input } from "@/components/ui";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
 
@@ -102,7 +101,7 @@ export default function InventoryLedgerPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [categoriesList, setCategoriesList] = useState<string[]>([
-    "ALL", "DRESSES", "TOPS", "OUTERWEAR", "TROUSERS", "ACCESSORIES"
+    "ALL", "READY-TO-WEAR", "COUTURE", "EVENING WEAR", "DRESSES", "TOPS", "OUTERWEAR", "TROUSERS", "ACCESSORIES"
   ]);
 
   const [catalog, setCatalog] = useState<SkuRecord[]>([]);
@@ -117,9 +116,8 @@ export default function InventoryLedgerPage() {
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 8;
 
-  // Refs for deduplicating API calls in React StrictMode
-  const categoriesFetched = React.useRef(false);
-  const lastFetchKey = React.useRef("");
+  // Reactivity & User Ref
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const userIdRef = React.useRef<string | null>(null);
 
   // Search Debouncer Effect
@@ -133,8 +131,7 @@ export default function InventoryLedgerPage() {
 
   // Load distinct categories list dynamically from DB products
   useEffect(() => {
-    if (categoriesFetched.current) return;
-    categoriesFetched.current = true;
+    let active = true;
 
     async function loadUniqueCategories() {
       try {
@@ -143,13 +140,14 @@ export default function InventoryLedgerPage() {
           .from("products")
           .select("category");
 
-        if (data) {
+        if (data && active) {
           const unique = Array.from(
             new Set(data.map((p) => (p.category || "Ready-to-Wear").toUpperCase()))
           ).filter(Boolean);
 
-          // Merge default set with database categories to preserve premium defaults
-          const merged = Array.from(new Set(["ALL", ...unique, "DRESSES", "TOPS", "OUTERWEAR", "TROUSERS", "ACCESSORIES"]));
+          const merged = Array.from(new Set([
+            "ALL", "READY-TO-WEAR", "COUTURE", "EVENING WEAR", "DRESSES", "TOPS", "OUTERWEAR", "TROUSERS", "ACCESSORIES", ...unique
+          ]));
           setCategoriesList(merged);
         }
       } catch (e) {
@@ -157,90 +155,100 @@ export default function InventoryLedgerPage() {
       }
     }
     loadUniqueCategories();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Fetch catalog with active filters and pagination from Supabase server
-  const fetchCatalog = async () => {
-    const fetchKey = `${debouncedSearch}-${selectedCategory}-${currentPage}`;
-    if (lastFetchKey.current === fetchKey) return;
-    lastFetchKey.current = fetchKey;
-
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      
-      let userId = userIdRef.current;
-      if (!userId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          userId = user.id;
-          userIdRef.current = user.id;
-        }
-      }
-
-      let query = supabase
-        .from("products")
-        .select("*", { count: "exact" });
-
-      if (userId) {
-        query = query.or(`seller_id.eq.${userId},seller_id.is.null`);
-      } else {
-        query = query.is("seller_id", null);
-      }
-
-      if (debouncedSearch.trim() !== "") {
-        const val = `%${debouncedSearch.trim()}%`;
-        query = query.or(`title.ilike.${val},sku.ilike.${val},material_composition.ilike.${val}`);
-      }
-
-      if (selectedCategory !== "ALL") {
-        query = query.ilike("category", selectedCategory);
-      }
-
-      const from = currentPage * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-
-      const { data, count, error } = await query
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
-
-      let dbProducts: SkuRecord[] = [];
-      if (data && data.length > 0) {
-        dbProducts = data.map((p: any) => ({
-          id: p.id,
-          sku: p.sku,
-          title: p.title,
-          category: p.category || "Ready-to-Wear",
-          stock: p.stock_by_size ? Object.values(p.stock_by_size).reduce((a: any, b: any) => Number(a) + Number(b), 0) as number : 10,
-          price: Number(p.price) || 0,
-          sourcing: p.material_composition || "Premium Sourced",
-          material: p.material_composition || "Selected Blend",
-          status: "ACTIVE",
-          imageUrl: p.image_urls && p.image_urls.length > 0
-            ? p.image_urls[0]
-            : FALLBACK_IMAGES[Math.abs((p.sku || p.id || "").split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % FALLBACK_IMAGES.length]
-        }));
-      } else {
-        // Fallback to static catalog only on page 0 if database is completely empty
-        if (currentPage === 0 && debouncedSearch.trim() === "" && selectedCategory === "ALL") {
-          dbProducts = STATIC_CATALOG;
-        }
-      }
-
-      setCatalog(dbProducts);
-      setTotalItems(count || dbProducts.length);
-    } catch (e) {
-      console.error("Failed to query catalog from Supabase", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    async function fetchCatalog() {
+      try {
+        const supabase = createClient();
+        
+        let userId = userIdRef.current;
+        if (!userId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && active) {
+            userId = user.id;
+            userIdRef.current = user.id;
+          }
+        }
+
+        let query = supabase
+          .from("products")
+          .select("*", { count: "exact" });
+
+        if (userId) {
+          query = query.or(`seller_id.eq.${userId},seller_id.is.null`);
+        } else {
+          query = query.is("seller_id", null);
+        }
+
+        if (debouncedSearch.trim() !== "") {
+          const val = `%${debouncedSearch.trim()}%`;
+          query = query.or(`title.ilike.${val},sku.ilike.${val},material_composition.ilike.${val}`);
+        }
+
+        if (selectedCategory !== "ALL") {
+          query = query.ilike("category", selectedCategory);
+        }
+
+        const from = currentPage * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+
+        const { data, count, error } = await query
+          .order("created_at", { ascending: false })
+          .range(from, to);
+
+        if (error) throw error;
+
+        if (!active) return;
+
+        let dbProducts: SkuRecord[] = [];
+        if (data && data.length > 0) {
+          dbProducts = data.map((p: any) => ({
+            id: p.id,
+            sku: p.sku,
+            title: p.title,
+            category: p.category || "Ready-to-Wear",
+            stock: p.stock_by_size ? Object.values(p.stock_by_size).reduce((a: any, b: any) => Number(a) + Number(b), 0) as number : 10,
+            price: Number(p.price) || 0,
+            sourcing: p.material_composition || "Premium Sourced",
+            material: p.material_composition || "Selected Blend",
+            status: "ACTIVE",
+            imageUrl: p.image_urls && p.image_urls.length > 0
+              ? p.image_urls[0]
+              : FALLBACK_IMAGES[Math.abs((p.sku || p.id || "").split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)) % FALLBACK_IMAGES.length]
+          }));
+        } else {
+          // Fallback to static catalog only on page 0 if database is completely empty
+          if (currentPage === 0 && debouncedSearch.trim() === "" && selectedCategory === "ALL") {
+            dbProducts = STATIC_CATALOG;
+          }
+        }
+
+        setCatalog(dbProducts);
+        setTotalItems(count || dbProducts.length);
+      } catch (e) {
+        console.error("Failed to query catalog from Supabase", e);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
     fetchCatalog();
-  }, [debouncedSearch, selectedCategory, currentPage]);
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch, selectedCategory, currentPage, refreshTrigger]);
 
   const handleDelete = (id?: string) => {
     if (!id) return;
@@ -267,8 +275,7 @@ export default function InventoryLedgerPage() {
 
       toast.success("Product deleted successfully");
       setProductToDelete(null);
-      lastFetchKey.current = ""; // Bust the local fetch deduplication cache
-      fetchCatalog(); // Refresh the list
+      setRefreshTrigger((prev) => prev + 1); // Refresh the list reactively
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Failed to delete product");
@@ -315,34 +322,28 @@ export default function InventoryLedgerPage() {
       <div className="bg-surface-white border border-muted-zinc rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
         {/* Search Input */}
         <div className="relative w-full md:w-80">
-          <input
+          <Input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search SKUs, materials, or sourcing..."
-            className="w-full bg-warm-linen/40 border border-muted-zinc rounded-md px-4 py-2.5 text-xs font-sans text-obsidian-velvet focus:outline-none focus:border-obsidian-velvet placeholder-obsidian-velvet/40"
+            className="py-2.5 text-xs"
           />
         </div>
 
         {/* Dynamic Category Dropdown Select */}
-        <div className="relative w-full md:w-56">
-          <select
+        <div className="w-full md:w-56">
+          <Combobox
+            options={categoriesList.map((c) => ({
+              label: c === "ALL" ? "All Categories" : c,
+              value: c,
+            }))}
             value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
+            onChange={(v) => {
+              setSelectedCategory(v);
               setCurrentPage(0);
             }}
-            className="w-full bg-warm-linen/40 border border-muted-zinc rounded-md px-4 py-2.5 text-xs font-sans font-bold text-obsidian-velvet/85 uppercase tracking-wider focus:outline-none focus:border-obsidian-velvet transition-colors cursor-pointer appearance-none pr-10"
-          >
-            {categoriesList.map((category) => (
-              <option key={category} value={category}>
-                {category === "ALL" ? "All Categories" : category}
-              </option>
-            ))}
-          </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-obsidian-velvet/40 text-[8px]">
-            ▼
-          </div>
+          />
         </div>
       </div>
 
@@ -603,36 +604,37 @@ export default function InventoryLedgerPage() {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!productToDelete}
         onClose={() => setProductToDelete(null)}
         title="Delete Product"
+        description="This action cannot be undone and the product will be removed from the catalog immediately."
         size="sm"
-      >
-        <div className="space-y-6">
-          <p className="font-sans text-sm text-obsidian-velvet/80">
-            Are you sure you want to permanently delete this product? This action cannot be undone and it will be removed from the catalog immediately.
-          </p>
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              onClick={() => setProductToDelete(null)}
+        closeOnBackdropClick={!isDeleting}
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              variant="outline"
+              size="sm"
               disabled={isDeleting}
-              className="border border-muted-zinc bg-surface-white px-4 py-2 rounded-md font-sans text-[10px] font-bold uppercase tracking-wider text-obsidian-velvet hover:bg-muted-zinc/20 transition-colors disabled:opacity-50 cursor-pointer"
+              onClick={() => setProductToDelete(null)}
             >
               Cancel
-            </button>
+            </Button>
             <Button
+              variant="danger"
+              size="sm"
               onClick={confirmDelete}
               disabled={isDeleting}
               loading={isDeleting}
-              variant="danger"
-              className="px-4 py-2 text-[10px] bg-red-600 text-white hover:bg-red-700 border-red-600"
+              className="bg-red-600 text-white hover:bg-red-700 border-red-600"
             >
               Confirm Delete
             </Button>
           </div>
-        </div>
+        }
+      >
+        <div />
       </Modal>
     </div>
   );

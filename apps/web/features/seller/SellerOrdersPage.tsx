@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { getMerchantOrders, updateMerchantOrderStatus } from "@/lib/actions/orders";
 import { toast } from "sonner";
+import { Input } from "@/components/ui";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
 
@@ -337,12 +338,12 @@ export default function SellerOrdersPage() {
       <div className="bg-surface-white border border-muted-zinc rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-none">
         {/* Search Input */}
         <div className="relative w-full md:w-80">
-          <input
+          <Input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search Order ID, customers, or items..."
-            className="w-full bg-warm-linen/40 border border-muted-zinc rounded-md px-4 py-2.5 text-xs font-sans text-obsidian-velvet focus:outline-none focus:border-obsidian-velvet placeholder-obsidian-velvet/40"
+            className="py-2.5 text-xs"
           />
         </div>
 

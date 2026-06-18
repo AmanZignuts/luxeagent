@@ -86,17 +86,36 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 3. Shoppers cannot access seller routes ───────────────────────
-  if (user && user.user_metadata?.role !== 'merchant' && isSellerRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/shop'
-    return NextResponse.redirect(url)
+  if (user && isSellerRoute) {
+    const isRegisteringMerchant = user.user_metadata?.role === 'merchant' && pathname.startsWith('/onboarding/merchant')
+    if (!isRegisteringMerchant) {
+      const { data: profile } = await supabase
+        .from('merchant_profiles')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!profile) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/shop'
+        return NextResponse.redirect(url)
+      }
+    }
   }
 
   // ── 4. Merchants cannot access shopper routes ─────────────────────
-  if (user && user.user_metadata?.role === 'merchant' && isShopperRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/seller/dashboard'
-    return NextResponse.redirect(url)
+  if (user && isShopperRoute) {
+    const { data: profile } = await supabase
+      .from('merchant_profiles')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (profile) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/seller/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

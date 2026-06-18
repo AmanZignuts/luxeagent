@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { handleApiError } from "@/lib/utils/error-handler";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 const loginSchema = yup.object().shape({
   email: yup.string().email("Please enter a valid email format.").required("Email address is required."),
@@ -19,7 +21,12 @@ const loginSchema = yup.object().shape({
 
 type LoginFormValues = yup.InferType<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const productId = searchParams.get("productId");
+  const size = searchParams.get("size");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -33,6 +40,45 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsSubmitting(true);
 
+    if (productId) {
+      // If we have a pending buy now / product redirect, sign in client-side to preserve parameters
+      const supabase = createClient();
+      try {
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+
+        if (error) {
+          toast.error(error.message);
+          setIsSubmitting(false);
+          return;
+        }
+
+        const actualRole = authData.user?.user_metadata?.role ?? "shopper";
+        if (actualRole !== "shopper") {
+          await supabase.auth.signOut();
+          toast.error("Access denied. Please use a shopper account to sign in here.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        toast.success("Welcome back! Signed in successfully.");
+        
+        // Refresh the router to update session state in middleware / RSC layout
+        router.refresh();
+        
+        setTimeout(() => {
+          router.push(`/checkout?productId=${productId}&size=${size || "M"}`);
+        }, 150);
+      } catch (err: any) {
+        handleApiError(err, "User Login");
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Default flow: use server action
     const formData = new FormData();
     formData.append("email", data.email);
     formData.append("password", data.password);
@@ -97,8 +143,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-
-
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <FormField label="Email Address" error={errors.email?.message}>
                 <Input
@@ -142,5 +186,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

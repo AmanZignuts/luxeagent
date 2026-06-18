@@ -4,7 +4,7 @@ import type { OrderItem, ShippingAddress } from '@/lib/supabase/types'
 
 /**
  * POST /api/orders
- * Mock checkout: creates a CONFIRMED order in the database.
+ * Simulated checkout: creates a CONFIRMED order in the database.
  */
 export async function POST(request: Request) {
   const supabase = await createClient()

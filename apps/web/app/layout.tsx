@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Inter } from "next/font/google";
+import { Playfair_Display, Inter, Geist } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { Agentation } from "agentation";
 import GlobalLoader from "@/components/GlobalLoader";
+import { cn } from "@/lib/utils";
+import { Suspense } from "react";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-serif",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Vestira — Elite Fashion Concierge",
@@ -26,11 +25,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="loading">
+    <html lang="en" className={cn("loading", "font-sans", geist.variable)}>
       <body
-        className={`${inter.variable} ${playfair.variable} antialiased`}
+        className={`${geist.variable} ${playfair.variable} antialiased`}
       >
-        <GlobalLoader />
+        <Suspense fallback={null}>
+          <GlobalLoader />
+        </Suspense>
         {children}
         <Toaster richColors position="top-right" closeButton />
         {process.env.NODE_ENV === "development" && <Agentation />}

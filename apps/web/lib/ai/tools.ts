@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getImageForChat, clearImageForChat } from '@/lib/ai/image-store'
 
 /**
- * LuxeAgent Tool Registry — AI SDK v6 compatible
+ * Vestira Concierge Tool Registry — AI SDK v6 compatible
  * AI SDK v6 uses `inputSchema` instead of `parameters`
  */
 
@@ -596,7 +596,7 @@ export const visualSearchTool = tool({
                   try {
                     const res = await fetch(url, {
                       signal: ctrl.signal,
-                      headers: { 'User-Agent': 'LuxeAgent/1.0' }
+                      headers: { 'User-Agent': 'VestiraConcierge/1.0' }
                     })
                     clearTimeout(timer)
                     if (!res.ok) return null
@@ -797,10 +797,7 @@ export const getCatalogCountTool = tool({
       q = (q as any).lte('price', priceMax)
     }
     if (query) {
-      // Keyword filter: search title, description, tags
-      q = (q as any).or(
-        `title.ilike.%${query}%,description.ilike.%${query}%,tags.cs.{"${query}"}`
-      )
+      q = (q as any).textSearch('fts_document', query, { config: 'english', type: 'websearch' })
     }
 
     const { count, error } = await q

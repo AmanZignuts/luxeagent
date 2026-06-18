@@ -10,6 +10,17 @@ export async function getMerchantOrders() {
     throw new Error('Unauthorized')
   }
 
+  // Verify that the user has a merchant profile in the database
+  const { data: merchantProfile } = await userClient
+    .from('merchant_profiles')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!merchantProfile) {
+    throw new Error('Unauthorized: Not a merchant')
+  }
+
   // 2. Fetch all orders using admin client to bypass RLS SELECT restriction
   const adminClient = await createAdminClient()
   const { data: allOrders, error: ordersError } = await adminClient
@@ -76,6 +87,17 @@ export async function updateMerchantOrderStatus(orderId: string, nextStatus: str
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) {
     throw new Error('Unauthorized')
+  }
+
+  // Verify that the user has a merchant profile in the database
+  const { data: merchantProfile } = await userClient
+    .from('merchant_profiles')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!merchantProfile) {
+    throw new Error('Unauthorized: Not a merchant')
   }
 
   // 2. Fetch the order items using admin client

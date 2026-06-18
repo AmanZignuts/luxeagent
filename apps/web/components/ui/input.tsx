@@ -4,24 +4,33 @@ interface FormFieldProps {
   label?: string;
   error?: any;
   optional?: boolean;
+  /** Optional helper text displayed below the label */
+  hint?: string;
   children: React.ReactNode;
   className?: string;
 }
 
-export function FormField({ label, error, optional, children, className = "" }: FormFieldProps) {
+export function FormField({ label, error, optional, hint, children, className = "" }: FormFieldProps) {
   const errorMessage = error && typeof error === "object" ? error.message : error;
 
   return (
     <div className={`space-y-1.5 w-full ${className}`}>
       {label && (
-        <label className="flex items-center gap-2 font-sans text-[10px] font-bold tracking-widest text-[#09090B]/50 uppercase">
-          {label}
-          {optional && (
-            <span className="text-[#09090B]/30 font-normal normal-case tracking-normal text-[10px]">
-              (optional)
-            </span>
+        <div className="space-y-0.5">
+          <label className="flex items-center gap-2 font-sans text-[10px] font-bold tracking-widest text-[#09090B]/50 uppercase">
+            {label}
+            {optional && (
+              <span className="text-[#09090B]/30 font-normal normal-case tracking-normal text-[10px]">
+                (optional)
+              </span>
+            )}
+          </label>
+          {hint && (
+            <p className="font-sans text-[10px] text-[#09090B]/40 leading-relaxed">
+              {hint}
+            </p>
           )}
-        </label>
+        </div>
       )}
       {children}
       {errorMessage && (
@@ -32,6 +41,7 @@ export function FormField({ label, error, optional, children, className = "" }: 
     </div>
   );
 }
+
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { error?: boolean; allowDecimals?: boolean }>(
   ({ className = "", error, onKeyDown, min, allowDecimals, ...props }, ref) => {

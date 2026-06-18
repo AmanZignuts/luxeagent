@@ -2,14 +2,13 @@ import { getModel } from '@/lib/ai/llm'
 import { streamText, convertToModelMessages, type UIMessage } from 'ai'
 import { agentTools, stepCountIs } from '@/lib/ai/tools'
 import { isQuotaError, markQuotaExceeded, parseRetryAfterSeconds } from '@/lib/ai/quota'
-import { runMockAgent } from '@/lib/ai/mock-agent'
 import { createClient } from '@/lib/supabase/server'
 import { setImageForChat, clearImageForChat } from '@/lib/ai/image-store'
 import type { Json } from '@/lib/supabase/types'
 
 export const maxDuration = 60  // seconds
 
-const SYSTEM_PROMPT_TEMPLATE = `You are LuxeAgent, an elite, decisive fashion concierge representing the Vestira atelier.
+const SYSTEM_PROMPT_TEMPLATE = `You are Vestira Concierge, an elite, decisive fashion concierge representing the Vestira atelier.
 You assist ONLY with styling, fashion curation, wardrobe, and our product catalog.
 
 Brand Voice & Perspective (CRITICAL):
@@ -82,7 +81,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     messages = (body.messages ?? []) as UIMessage[]
     chatId = body.chatId || ''
-    const { mock, imageBase64 } = body
+    const { imageBase64 } = body
 
     // ── Backend Validation: Enforce maximum message length ──
     const latestUserMessage = [...messages].reverse().find(m => m.role === 'user')
@@ -115,46 +114,14 @@ export async function POST(request: Request) {
       bodyKeys: Object.keys(body),
     })
 
-    const isMockMode = mock === true || process.env.AI_USE_MOCK === 'true'
-
-    if (isMockMode) {
-      console.log('[chat/route] Operating in mock/demo fallback mode')
-      const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
-      let userQuery = ''
-      if (lastUserMessage) {
-        if (Array.isArray(lastUserMessage.parts)) {
-          for (const part of lastUserMessage.parts) {
-            if (part.type === 'text') {
-              userQuery = (part as any).text || ''
-              break
-            }
-          }
-        }
-        if (!userQuery && typeof (lastUserMessage as any).content === 'string') {
-          userQuery = (lastUserMessage as any).content
-        }
-      }
-      return runMockAgent(userQuery, chatId, messages)
-    }
-
-    const provider = process.env.LLM_PROVIDER || 'google'
-    let hasApiKey = false
-    let providerName = 'Gemini'
-
-    if (provider === 'openai') {
-      hasApiKey = !!process.env.OPENAI_API_KEY
-      providerName = 'OpenAI'
-    } else {
-      hasApiKey = !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY)
-      providerName = 'Gemini'
-    }
+    const hasApiKey = !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY)
 
     if (!hasApiKey) {
-      console.warn(`[chat/route] API key is missing for provider: ${provider}`)
+      console.warn('[chat/route] Gemini API key is missing')
       return new Response(
         JSON.stringify({
           error: 'MISSING_API_KEY',
-          message: `${providerName} API key is not configured.`
+          message: 'Gemini API key is not configured.'
         }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       )

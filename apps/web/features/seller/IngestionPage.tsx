@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { FormField, Input, Textarea, Select } from "@/components/ui/input";
+import { FormField, Input, Textarea } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { handleApiError } from "@/lib/utils/error-handler";
 
@@ -38,6 +39,7 @@ const ingestionSchema = yup.object().shape({
 
 function IngestionForm() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const editId = searchParams.get("id");
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -55,6 +57,8 @@ function IngestionForm() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<any>({
     resolver: yupResolver(ingestionSchema),
@@ -111,11 +115,15 @@ function IngestionForm() {
       async function fetchProduct() {
         try {
           const supabase = createClient();
-          const { data } = await supabase
-            .from("products")
-            .select("*")
-            .or(`id.eq.${editId},sku.eq.${editId}`)
-            .maybeSingle();
+          const id = editId as string;
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+          let query = supabase.from("products").select("*");
+          if (isUuid) {
+            query = query.or(`id.eq.${id},sku.eq.${id}`);
+          } else {
+            query = query.eq("sku", id);
+          }
+          const { data } = await query.maybeSingle();
 
           if (data) {
             reset({
@@ -176,38 +184,35 @@ function IngestionForm() {
 
     try {
       if (editId) {
-        const supabase = createClient();
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editId);
-        
-        let query = supabase
-          .from("products")
-          .update({
-            title: values.productName,
-            price: Number(values.price),
-            sku: values.sku,
-            description: values.description,
-            category: values.category,
-            brand: values.brandName,
-            material_composition: values.material,
-            image_urls: imageUrl && !imageUrl.startsWith('blob:') ? [imageUrl] : [],
-            stock_by_size: { M: Number(values.stock || 10) }
-          });
+        const formData = new FormData();
+        formData.append("id", editId);
+        formData.append("title", values.productName);
+        formData.append("price", String(values.price));
+        formData.append("sku", values.sku);
+        formData.append("category", values.category);
+        formData.append("brand", values.brandName);
+        formData.append("description", values.description);
+        formData.append("material", values.material);
+        formData.append("stock", String(values.stock || 10));
 
-        if (isUuid) {
-          query = query.eq('id', editId);
-        } else {
-          query = query.eq('sku', editId);
+        if (uploadFile) {
+          formData.append("images", uploadFile);
         }
 
-        const { error } = await query;
+        const res = await fetch("/api/admin/update", {
+          method: "POST",
+          body: formData,
+        });
 
-        if (error) {
-          throw new Error(error.message);
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          throw new Error(data.error || "Failed to update product details");
         }
 
-        toast.success("Product changes saved successfully to database.");
+        toast.success("Product changes saved successfully.");
         setIsSaving(false);
-        window.location.href = "/seller/inventory";
+        router.refresh();
+        router.push("/seller/inventory");
         return;
       }
 
@@ -232,7 +237,8 @@ function IngestionForm() {
 
       toast.success("Product successfully added to inventory!");
       setIsSaving(false);
-      window.location.href = "/seller/inventory";
+      router.refresh();
+      router.push("/seller/inventory");
     } catch (err: any) {
       handleApiError(err, "Product Vision Ingestion");
       setIsSaving(false);
@@ -347,16 +353,19 @@ function IngestionForm() {
               </FormField>
 
               <FormField label="Category" error={errors.category?.message}>
-                <Select
-                  disabled={isSaving}
+                <Combobox
+                  options={[
+                    { label: "Select category...", value: "" },
+                    ...categoriesList.map((c) => ({ label: c, value: c })),
+                  ]}
+                  value={watch("category") || ""}
+                  onChange={(v) =>
+                    setValue("category", v, { shouldValidate: true })
+                  }
                   error={!!errors.category}
-                  {...register("category")}
-                >
-                  <option value="">Select...</option>
-                  {categoriesList.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </Select>
+                  disabled={isSaving}
+                  placeholder="Select category..."
+                />
               </FormField>
 
               <FormField label="Price (USD)" error={errors.price?.message}>

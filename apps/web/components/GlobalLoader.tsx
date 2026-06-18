@@ -1,20 +1,42 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export default function GlobalLoader() {
+  const pathname = usePathname();
   const [loaderVisible, setLoaderVisible] = useState(true);
   const [loaderFading, setLoaderFading] = useState(false);
 
+  // Skip loader on seller routes
+  const isSellerRoute = pathname.startsWith("/seller");
+
   useEffect(() => {
+    // Check sessionStorage to see if loader was already shown in this tab session
+    const hasAlreadyShown = typeof window !== "undefined" && sessionStorage.getItem("global_loader_shown") === "true";
+
+    if (isSellerRoute || hasAlreadyShown) {
+      setLoaderVisible(false);
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.remove("loading");
+      }
+      return;
+    }
+
     // Start fading at 2.0s, remove from DOM at 2.8s
     const timer1 = setTimeout(() => setLoaderFading(true), 2000);
-    const timer2 = setTimeout(() => setLoaderVisible(false), 2800);
+    const timer2 = setTimeout(() => {
+      setLoaderVisible(false);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("global_loader_shown", "true");
+      }
+    }, 2800);
+
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, []);
+  }, [isSellerRoute]);
 
   useEffect(() => {
     if (loaderFading) {
@@ -25,7 +47,8 @@ export default function GlobalLoader() {
     };
   }, [loaderFading]);
 
-  if (!loaderVisible) return null;
+  const hasAlreadyShownOnMount = typeof window !== "undefined" && sessionStorage.getItem("global_loader_shown") === "true";
+  if (isSellerRoute || hasAlreadyShownOnMount || !loaderVisible) return null;
 
   return (
     <>

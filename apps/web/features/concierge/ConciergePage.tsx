@@ -472,12 +472,12 @@ export default function ConciergePageV2() {
               </svg>
             </div>
             <h2 className="font-serif text-2xl font-light text-obsidian-velvet tracking-tight mb-2">
-              {apiError === "MISSING_API_KEY" ? "Missing API Key" : "Quota Exceeded / API Error"}
+              {apiError === "MISSING_API_KEY" ? "Service Configuration Issue" : "Service Temporarily Unavailable"}
             </h2>
             <p className="font-sans text-xs text-obsidian-velvet/60 leading-relaxed mb-4">
               {apiError === "MISSING_API_KEY" 
-                ? "Please configure your API key in the environment variables to continue using the AI Concierge."
-                : "The AI Provider returned a quota limit or usage error. Please verify your billing/plan configuration (e.g. OpenAI billing dashboard, Google AI Studio, or Groq Cloud Console)."}
+                ? "The styling room is experiencing a setup issue. Please contact support or try again later."
+                : "The styling room is experiencing high volume or a connection issue. Please return to the shop and try again in a few moments."}
             </p>
             {apiErrorMessage && (
               <div className="mb-6 p-4 bg-red-50/50 border border-red-100 rounded-xl text-left max-h-[160px] overflow-y-auto">

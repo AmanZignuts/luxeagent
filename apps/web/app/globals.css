@@ -1,19 +1,45 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #FAF0E6;
-  --foreground: #09090B;
+  /* ── Vestira Brand Tokens ─────────────────────────────────── */
   --bg-warm-linen: #FAF0E6;
   --fg-obsidian-velvet: #09090B;
   --surface-white: #FFFFFF;
   --tint-champagne: #F2EBD9;
   --border-muted-zinc: #E4E4E7;
+
+  /* ── shadcn/ui Variable Bridge → Vestira Palette ─────────── */
+  /* These override shadcn's generic oklch defaults so every    */
+  /* shadcn component (Dialog, Select, etc.) inherits our brand */
+  --background: #FAF0E6;          /* warm-linen */
+  --foreground: #09090B;          /* obsidian-velvet */
+  --card: #FFFFFF;                /* surface-white */
+  --card-foreground: #09090B;
+  --popover: #FFFFFF;             /* dropdowns, tooltips */
+  --popover-foreground: #09090B;
+  --primary: #09090B;             /* obsidian-velvet → primary CTA */
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2EBD9;           /* champagne-tint */
+  --secondary-foreground: #09090B;
+  --muted: #FAF0E6;               /* warm-linen */
+  --muted-foreground: rgba(9, 9, 11, 0.5);
+  --accent: #F2EBD9;              /* champagne-tint */
+  --accent-foreground: #09090B;
+  --destructive: #dc2626;
+  --border: #E4E4E7;              /* muted-zinc */
+  --input: #E4E4E7;
+  --ring: #09090B;                /* focus ring = obsidian */
+  --radius: 0.375rem;             /* = rounded-md (6px) */
 }
 
 @theme {
   --font-serif: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  
+
   --color-warm-linen: var(--bg-warm-linen);
   --color-obsidian-velvet: var(--fg-obsidian-velvet);
   --color-surface-white: var(--surface-white);
@@ -83,3 +109,59 @@ body {
   height: 100vh !important;
 }
 
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Vestira is a light-only design system — no dark mode variables needed */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

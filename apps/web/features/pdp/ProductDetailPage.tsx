@@ -77,6 +77,25 @@ export default function ProductDetailPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState<"details" | "sourcing" | null>("details");
 
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const isAlreadyInBag = product
     ? bagItems.some((item) => item.id === product.id && item.size === activeSize)
     : false;
@@ -210,7 +229,18 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = () => {
     if (!product) return;
-    router.push(`/checkout?productId=${product.id}&size=${activeSize}`);
+    if (isLoggedIn) {
+      router.push(`/checkout?productId=${product.id}&size=${activeSize}`);
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("open-auth", {
+          detail: {
+            pendingAction: () =>
+              router.push(`/checkout?productId=${product.id}&size=${activeSize}`),
+          },
+        })
+      );
+    }
   };
 
   const primaryImage = product.imageUrls[0] || "/product_overshirt.png";

@@ -28,6 +28,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Verify that the user has a merchant profile in the database
+  const { data: merchantProfile } = await userClient
+    .from('merchant_profiles')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!merchantProfile) {
+    return NextResponse.json({ error: 'Unauthorized: Not a merchant' }, { status: 403 })
+  }
+
   const supabase = await createAdminClient()
 
   try {

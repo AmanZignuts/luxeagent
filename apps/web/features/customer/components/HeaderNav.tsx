@@ -11,6 +11,7 @@ interface HeaderNavProps {
   onSignIn: () => void;
   onSignOut: (e: React.MouseEvent) => void;
   onToggleBag: (open: boolean) => void;
+  onProtectedNavigation?: (targetPath: string) => void;
 }
 
 export function HeaderNav({
@@ -19,6 +20,7 @@ export function HeaderNav({
   onSignIn,
   onSignOut,
   onToggleBag,
+  onProtectedNavigation,
 }: HeaderNavProps) {
   const pathname = usePathname();
   const { bagItems } = useBag();
@@ -30,6 +32,14 @@ export function HeaderNav({
   }, []);
 
   const bagCount = bagItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      setIsProfileDropdownOpen(false);
+      onProtectedNavigation?.(href);
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 w-full bg-surface-white/80 backdrop-blur-md border-b border-muted-zinc z-50 h-16">
@@ -75,6 +85,7 @@ export function HeaderNav({
           </Link>
           <Link
             href="/profile"
+            onClick={(e) => handleLinkClick(e, "/profile")}
             className={`hover:text-obsidian-velvet transition-colors pb-0.5 ${
               pathname === "/profile"
                 ? "text-obsidian-velvet border-b border-obsidian-velvet font-bold"
@@ -85,6 +96,7 @@ export function HeaderNav({
           </Link>
           <Link
             href="/orders"
+            onClick={(e) => handleLinkClick(e, "/orders")}
             className={`hover:text-obsidian-velvet transition-colors pb-0.5 ${
               pathname === "/orders"
                 ? "text-obsidian-velvet border-b border-obsidian-velvet font-bold"
@@ -95,6 +107,7 @@ export function HeaderNav({
           </Link>
           <Link
             href="/concierge"
+            onClick={(e) => handleLinkClick(e, "/concierge")}
             className="hover:text-amber-600 transition-colors pb-0.5 font-bold text-amber-600/80 font-sans text-[10px] uppercase tracking-widest"
           >
             ✦ AI Concierge

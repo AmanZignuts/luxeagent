@@ -1,43 +1,52 @@
 import React from "react";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 
 interface SignOutModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  /** Pass true while the sign-out async operation is in progress */
+  isLoading?: boolean;
 }
 
-export function SignOutModal({ isOpen, onClose, onConfirm }: SignOutModalProps) {
-  if (!isOpen) return null;
-
+export function SignOutModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading = false,
+}: SignOutModalProps) {
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center animate-in fade-in duration-200">
-      <div className="bg-surface-white border border-muted-zinc rounded-xl p-8 max-w-sm w-full mx-4 space-y-6 shadow-none animate-in zoom-in-95 duration-200">
-        <div className="space-y-2 text-center">
-          <h3 className="font-serif text-2xl font-light tracking-tight text-obsidian-velvet">
-            Confirm Sign Out
-          </h3>
-          <p className="font-sans text-xs text-obsidian-velvet/60 leading-relaxed">
-            Are you sure you want to end your current session? You will need to sign in again to access the shop.
-          </p>
-        </div>
-
-        <div className="flex gap-4 pt-2">
-          <button
-            type="button"
+    <Modal
+      isOpen={isOpen}
+      onClose={isLoading ? () => {} : onClose}
+      title="Confirm Sign Out"
+      description="Are you sure you want to end your current session? You will need to sign in again to access the shop."
+      size="sm"
+      closeOnBackdropClick={!isLoading}
+      footer={
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="md"
+            disabled={isLoading}
             onClick={onClose}
-            className="flex-1 border border-muted-zinc hover:border-obsidian-velvet hover:bg-warm-linen/20 text-obsidian-velvet font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer"
+            className="flex-1"
           >
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            loading={isLoading}
+            disabled={isLoading}
             onClick={onConfirm}
-            className="flex-1 bg-obsidian-velvet hover:bg-obsidian-velvet/90 text-surface-white font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer"
+            className="flex-1"
           >
             Sign Out
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      }
+    />
   );
 }

@@ -11,6 +11,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Verify that the user has a merchant profile in the database
+    const { data: merchantProfile } = await userClient
+      .from('merchant_profiles')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!merchantProfile) {
+      return NextResponse.json({ error: 'Unauthorized: Not a merchant' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     
@@ -19,6 +30,21 @@ export async function DELETE(request: Request) {
     }
 
     const supabase = await createAdminClient()
+
+    // Verify product ownership (seller_id must match user.id)
+    const { data: product } = await supabase
+      .from('products')
+      .select('seller_id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (!product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    if (product.seller_id !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized: You do not own this product' }, { status: 403 })
+    }
     
     // Attempt deletion with admin client to bypass RLS restrictions
     const { error } = await supabase.from('products').delete().eq('id', id)

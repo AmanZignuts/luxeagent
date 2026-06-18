@@ -1,317 +1,209 @@
-# Vestira
+# Vestira & Vestira Concierge Monorepo
 
-**AI-Enhanced E-Commerce — Agentic Fashion Concierge**
+**AI-Enhanced E-Commerce Platform & Agentic Fashion Concierge**
 
-**Vestira** is a high-end fashion commerce platform built with **Next.js 15**, **Vercel AI SDK**, and **Supabase (pgvector)**. Its centerpiece is **LuxeAgent**—the in-app AI concierge—that moves beyond passive search toward **agentic commerce**: understanding natural-language intent, running tool calls against live catalog data, and streaming **Generative UI** (product carousels, size pickers, outfit builders) directly into the chat experience.
+Welcome to **Vestira**, a high-end luxury fashion e-commerce platform built with **Next.js 15**, the **Vercel AI SDK**, and **Supabase**. 
 
-The system combines **multi-modal RAG** (product text + vision-derived image captions) with **hybrid search** (pgvector semantic similarity + Postgres full-text / BM25-style keyword ranking fused via Reciprocal Rank Fusion). This mirrors the industry shift from chatbots to autonomous shopping agents—deep discovery, inventory-aware recommendations, and conversion inside one conversational flow.
-
-> **Naming:** **Vestira** is the product and brand (UI, auth, seller portal). **LuxeAgent** is the autonomous stylist agent persona used in `/concierge` and `/api/chat`.
+At the center of Vestira is **Vestira Concierge**—an autonomous AI stylist concierge designed for premium commerce. Vestira Concierge understands natural language requests, uploads and analyzes reference images, executes tools against live database catalogs using hybrid search, and streams interactive **Generative UI** widgets (like outfit builders, size pickers, and product carousels) directly into the customer's chat.
 
 ---
 
-## Highlights
-
-| # | Capability | Implementation |
-|---|------------|----------------|
-| 1 | **Agentic concierge** | Vercel AI SDK v6 (`streamText`, tool calling, UI message streams) + Google Gemini 2.0 Flash |
-| 2 | **Hybrid search** | Supabase RPC `hybrid_search`: HNSW vector ANN + `tsvector` FTS, RRF fusion (default 70% semantic / 30% keyword) |
-| 3 | **Multi-modal RAG** | Vision metadata on ingest → text + image caption embeddings → fused `combined_embedding` (60/40) |
-| 4 | **Generative UI** | Concierge renders carousels, size pickers, comparisons, outfit builders from tool payloads |
-| 5 | **Seller vision pipeline** | `POST /api/admin/ingest` — upload images → Gemini Vision → embeddings → catalog |
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Framework | [Next.js 15](https://nextjs.org/) (App Router, React 19) |
-| AI | [Vercel AI SDK](https://sdk.vercel.ai/) v6, `@ai-sdk/google`, `@ai-sdk/react` |
-| LLM / Vision / Embeddings | Google Gemini 2.0 Flash, `gemini-embedding-2` (768-dim) |
-| Database & Auth | [Supabase](https://supabase.com/) — Postgres, Auth, Storage, RLS |
-| Vector search | `pgvector` + **HNSW** indexes (`vector_cosine_ops`) |
-| Keyword search | Generated `fts_document` + `ts_rank_cd` / `websearch_to_tsquery` |
-| Styling | Tailwind CSS 4, editorial design tokens (warm linen / obsidian palette) |
-| Validation | Zod 4 |
+## 📖 Table of Contents
+1. [Key Highlights](#-key-highlights)
+2. [Tech Stack](#-tech-stack)
+3. [Architecture Overview](#-architecture-overview)
+4. [Prerequisites](#-prerequisites)
+5. [Getting Started (Step-by-Step)](#-getting-started-step-by-step)
+6. [Environment Variables](#-environment-variables)
+7. [App Routing & Page Matrix](#-app-routing--page-matrix)
+8. [User Roles & Authentication](#-user-roles--authentication)
+9. [Development Scripts](#-development-scripts)
+10. [Architecture Specifications](#-architecture-specifications)
 
 ---
 
-## AI Flow
+## ✨ Key Highlights
 
-High-level journey from user query to purchase-oriented UI:
+* **Agentic Stylist Concierge:** Leverages Vercel AI SDK v6 (`streamText`, tool calling, and Generative UI streams) with Google Gemini to guide users, check stock, suggest edits, and construct outfits.
+* **Hybrid Search (pgvector + FTS):** Custom Supabase RPC fuses HNSW-indexed vector search (for semantic meaning) with Postgres Full-Text Search (for exact match keywords) using Reciprocal Rank Fusion (RRF).
+* **Multi-Modal Vision & Update Pipeline:** Handles automated ingestion and secure updates (`POST /api/admin/update`). Upload or edit product attributes, extract tags, colors, and descriptions using Gemini Vision, and automatically regenerate and fuse 768-dimensional textual-visual embeddings.
+* **Accessible Component Architecture:** Fully integrated Radix UI (via `shadcn/ui`) design system mapped to custom HSL brand tokens, replacing all native forms, selects, and dialogs with keyboard-navigable components.
+* **Seamless Guest Session Merging:** Intercepts protected guest routes to prompt in-place login modals instead of hard page redirects. Upon authentication, guest shopping carts (`localStorage`) merge automatically with the user's database cart, maintaining uninterrupted shopping sessions.
+* **Transferable Product Ownership:** Secure Postgres Row-Level Security (RLS) policies permit merchants to query and edit default seeded products, automatically transferring item ownership to the merchant's authenticated account upon save.
+* **Performance & UX Optimization:** Bypasses global loading states for seller dashboard routes, implements `sessionStorage` caching to display the customer loading splash screen only once per tab session, and supports Next.js Partial Prerendering (PPR) for instant page load times.
+* **Interactive Developer Sidebar:** Integrated [Agentation](https://github.com/agentation/agentation) UI dashboard in development mode to inspect state, trace tool-calling history, and debug agent execution.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Description |
+|---|---|---|
+| **Framework** | [Next.js 15](https://nextjs.org/) (App Router, React 19) | Main web application framework |
+| **AI SDK** | [Vercel AI SDK](https://sdk.vercel.ai/) v6, `@ai-sdk/google` | Multi-step agent orchestrator and React UI streams |
+| **LLM & Vision** | Google Gemini 2.0 / 1.5 | Model used for chat, vision tagging, and metadata extraction |
+| **Embeddings** | `text-embedding-004` (or `gemini-embedding-2`) | 768-dimensional textual and vision caption embeddings |
+| **Database** | [Supabase](https://supabase.com/) (PostgreSQL) | Data persistence, Auth, Storage, and RLS security |
+| **Vector Index** | `pgvector` with HNSW Index | Cosine-distance optimized vector space search |
+| **Styling** | Tailwind CSS 4 | Minimalist editorial warm-linen & obsidian design system |
+| **Developer Tools**| `agentation` | Developer debug sidebar and trace dashboard |
+
+---
+
+## 🏛️ Architecture Overview
+
+The codebase is organized as an **npm monorepo** workspace to logically isolate the Next.js application, utility scripts, and Supabase config layers:
 
 ```text
-User Query (text and/or image)
-        ↓
-POST /api/chat  →  Gemini + system prompt
-        ↓
-Intent + tool selection (max 5 steps)
-        ↓
-Tools → hybridSearch / Supabase RPC / profile & orders
-        ↓
-Structured tool results (type: product_carousel, size_picker, …)
-        ↓
-Concierge showcase panel (Generative UI)
-        ↓
-Add to bag · checkout · orders (customer app)
+├── apps/
+│   └── web/                # The main Next.js 15 application (pages, components, API routes)
+│       ├── app/            # App Router routes (concierge, shop, seller dashboards, auth)
+│       ├── components/     # Reusable layout and theme elements
+│       ├── features/       # Feature-specific components (concierge, outfit-builder, checkout)
+│       └── lib/            # Shared logic (AI orchestrator, database clients, helpers)
+├── scripts/                # Node utility scripts (seed inserts, backfill embeddings)
+├── supabase/               # Database management and environment setup
+│   └── migrations/         # Database migrations (schemas, RPCs, index setup, seed products)
+├── .env.example            # Template for environment configuration
+└── package.json            # Root monorepo configuration & runner scripts
 ```
 
-### Frontend (Vestira shop + LuxeAgent concierge)
-
-- **Conversational UI** — streaming tokens, quick prompts, image upload / drag-drop for visual search
-- **Generative UI** — maps tool `type` to React components: `ProductCarousel`, `SizePicker`, `OutfitBuilder`, `ProductComparisonCard`, `ImageSearchResult`, `OccasionRecommendation`, order and style profile widgets
-- **Image-based discovery** — user uploads reference image; model sees multimodal input, describes aesthetics, calls `findSimilarProducts`
-- **Cart integration** — `addToBag` tool + shared `BagContext` across customer routes
-- **Session persistence** — authenticated users: `chat_sessions` upsert on stream finish
-
-### Backend (Agent + Data)
-
-- **Orchestration** — `app/api/chat/route.ts`: `streamText` with `agentTools`, `stopWhen: stepCountIs(5)`, mock fallback on quota errors
-- **Hybrid search** — `lib/ai/search.ts` embeds query → `hybrid_search` RPC; fallback to FTS-only if embedding API fails
-- **Vision ingest** — `app/api/admin/ingest/route.ts`: Storage upload → Gemini Vision JSON metadata → dual embeddings → `products` + `product_embeddings`
-- **Inventory** — `check_inventory` RPC + `checkInventory` tool → live size availability UI
-
-### Agent Tools
-
-| Tool | Purpose | UI payload |
-|------|---------|------------|
-| `searchProducts` | Natural-language catalog search | `product_carousel` |
-| `findSimilarProducts` | Visual / description similarity | `image_search_result` |
-| `checkInventory` | SKU stock by size | `size_picker` |
-| `getProductDetails` | Full SKU metadata | `product_details` |
-| `getPersonalizedRecommendations` | Style profile + hybrid search | `personalized_carousel` |
-| `recommendByOccasion` | Wedding, office, vacation, etc. | `occasion_recommendation` |
-| `generateOutfitLook` | Multi-category outfit | `outfit_builder` |
-| `compareProducts` | Side-by-side two SKUs | `product_comparison` |
-| `getUserStyleProfile` | Onboarding preferences | `style_profile` |
-| `getOrderStatus` | Order history / tracking | `order_status` |
-| `addToBag` | Cart action from chat | `add_to_bag_confirm` |
+> [!NOTE]
+> **Symlinked Environments:** The file `apps/web/.env.local` is a symbolic link pointing to the root `.env.local` configuration. Defining variables in the root directory will automatically configure the Next.js application.
 
 ---
 
-## Hybrid Search (How It Works)
+## 📋 Prerequisites
 
-1. **Query embedding** — User text (or vision-derived description) → 768-dim vector via Google embeddings API.
-2. **Semantic leg** — `product_embeddings.combined_embedding` ANN search (HNSW, cosine distance).
-3. **Keyword leg** — `products.fts_document` matched with `websearch_to_tsquery` + `ts_rank_cd`.
-4. **RRF fusion** — Weighted reciprocal rank fusion in SQL (`semantic_weight` / `keyword_weight`, `rrf_k = 60`).
-5. **Filters** — Optional category, gender, price min/max applied in both legs.
+Before setting up the repository, make sure you have the following installed/ready:
 
-Defined in `supabase/migrations/20260602000005_hybrid_search_rpc.sql` and invoked from `lib/ai/search.ts`.
-
----
-
-## Multi-Modal RAG Pipeline (Seller Ingest)
-
-```text
-Product images (multipart upload)
-        ↓
-Supabase Storage (product-images bucket)
-        ↓
-Gemini Vision → description, category, tags, colors, image_caption
-        ↓
-Text document (weighted title/tags) → text_embedding
-Image caption → image_embedding
-        ↓
-fuseEmbeddings (60% text + 40% image) → combined_embedding
-        ↓
-products.vector_status: PENDING → ACTIVE
-```
-
-Re-run embeddings for seeded/pending SKUs with:
-
-```bash
-npx tsx scripts/generate-embeddings.ts
-```
+1. **Node.js** (v20 or higher recommended)
+2. **npm** (comes packaged with Node.js)
+3. **Docker Desktop** (Required **ONLY** if you plan to run Supabase locally using the Supabase CLI)
+4. **Google AI Studio Key:** A Gemini API key is required to use the AI stylist. Get your key at [Google AI Studio](https://aistudio.google.com/apikey).
+5. **Supabase Account** (Required **ONLY** if you choose to host your database on the cloud instead of running locally)
 
 ---
 
-## Project Structure
+## 🚀 Getting Started (Step-by-Step)
 
-```text
-app/
-├── (auth)/              login, register, style-persona & merchant onboarding
-├── (customer)/          shop, PDP, checkout, profile, orders, BagContext
-├── (ai)/concierge/      full-screen AI concierge + Generative UI components
-├── seller/              merchant dashboard, inventory, ingestion, orders
-├── api/
-│   ├── chat/            AI agent streaming endpoint
-│   ├── admin/ingest/    vision + embedding product pipeline
-│   └── orders/          order APIs
-lib/
-├── ai/                  tools, search, embeddings, mock fallback
-├── actions/             auth & orders server actions
-└── supabase/            SSR clients, generated types
-supabase/migrations/     schema, HNSW, FTS, hybrid_search RPC, RLS, seed data
-scripts/                 embedding backfill, model listing utilities
-```
+Follow these steps to configure and boot up your local development environment:
 
-See `PROJECT_ANTIGRAVITY_SPEC.md` for layout shells, design tokens, and route contracts.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 20+
-- **npm** (or pnpm/yarn)
-- **Supabase** project (local CLI or hosted)
-- **Google AI API key** ([Google AI Studio](https://aistudio.google.com/apikey))
-
-### 1. Clone and install
-
+### Step 1: Clone the Repo & Install Dependencies
+Clone the repository and run `npm install` from the root folder to download all required packages for both the web workspace and local utilities:
 ```bash
 git clone <your-repo-url>
-cd vestira   # or your local folder name
+cd luxeagent
 npm install
 ```
 
-### 2. Environment variables
-
-Create `.env.local` in the project root:
-
-```env
-# Supabase (Project Settings → API)
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<service-role-key>   # server-only: ingest & scripts
-
-# Google Generative AI (AI SDK reads this name)
-GOOGLE_GENERATIVE_AI_API_KEY=<your-google-api-key>
-```
-
-Never commit `.env.local` or service role keys.
-
-### 3. Database setup
-
-**Option A — Supabase CLI (recommended for local dev)**
-
+### Step 2: Configure Environment Variables
+Copy the environment variables template to a new file named `.env.local` in the root directory:
 ```bash
+cp .env.example .env.local
+```
+Open `.env.local` and enter your credentials (see [Environment Variables](#-environment-variables) below for a breakdown). At a minimum, you will need a `GEMINI_API_KEY`.
+
+### Step 3: Run Database Setup
+
+You can choose between setting up the database locally (recommended) or using a hosted Supabase project.
+
+#### Option A: Local Supabase Instance (Recommended)
+Make sure **Docker Desktop** is running, then run:
+```bash
+# Start the local database, storage bucket, and auth service containers
 npx supabase start
-npx supabase db reset   # applies all migrations under supabase/migrations/
+
+# Apply all schema migrations and run the SQL product seeds
+npx supabase db reset
 ```
+*This command runs database migrations located in `supabase/migrations/` to establish tables, configure HNSW vector and full-text indexes, define RLS security policies, and seed products.*
 
-**Option B — Hosted Supabase**
-
-Link your project and push migrations:
-
+#### Option B: Hosted Supabase Instance (Cloud)
+If you prefer using a remote hosted Supabase project:
 ```bash
-npx supabase link --project-ref <project-ref>
+# Link the CLI to your project reference ID
+npx supabase link --project-ref <your-project-ref>
+
+# Push the migration schemas to your hosted database
 npx supabase db push
 ```
 
-Migrations enable `vector`, create `products` / `product_embeddings` / `user_style_profiles` / `orders` / `chat_sessions`, HNSW indexes, FTS triggers, `hybrid_search` + `check_inventory` RPCs, RLS policies, and seed products.
-
-### 4. Generate embeddings for seed catalog
-
-After migrations, backfill vectors for seeded products:
-
+### Step 4: Backfill Product Embeddings
+The seed files populate the database with fashion products but they don't contain pre-generated vectors. Run the backfill script to convert text attributes and vision captions into embeddings via Gemini:
 ```bash
 npx tsx scripts/generate-embeddings.ts
 ```
+*Note: This script requires a valid `GEMINI_API_KEY` and the `SUPABASE_SERVICE_ROLE_KEY` (to bypass RLS during write operations).*
 
-Requires `SUPABASE_SERVICE_ROLE_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY`.
-
-### 5. Run the app
-
+### Step 5: Start the Development Server
+Launch the Next.js development server from the root of the repository:
 ```bash
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) to view the application. The homepage will automatically redirect you to `/landing`.
+---
 
-Open [http://localhost:3000](http://localhost:3000) → redirects to `/landing`.
+## 🔑 Environment Variables
 
-| Route | Description |
-|-------|-------------|
-| `/landing` | Marketing entry |
-| `/shop` | Product feed (public) |
-| `/pdp/[itemId]` | Product detail + lookbook |
-| `/concierge` | AI concierge (auth required) |
-| `/login`, `/register` | Auth |
-| `/onboarding/style-persona` | Shopper style calibration |
-| `/seller/*` | Merchant panel (role: `merchant` in user metadata) |
-| `/api/chat` | Agent streaming API |
+The system supports the following environment variables inside `.env.local`:
 
-**Mock / demo mode** (no Gemini quota): `/concierge?mock=true`, or set `AI_USE_MOCK=true` in `.env.local`. When the free tier is exhausted, the API automatically falls back to demo mode with real catalog tool calls.
-
-### 6. Production build
-
-```bash
-npm run build
-npm start
-```
-
-Deploy to **Vercel** with the same environment variables. Partial Prerendering (PPR) is prepared in `next.config.ts` but commented out until Next.js canary; enable when your deployment channel supports `experimental.ppr`.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | `http://127.0.0.1:54321` | The API URL of your local or hosted Supabase project |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | - | Public API key for client-side queries (enforces RLS) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | - | Secret admin key used only for backend ingestion and seeding scripts |
+| `GEMINI_API_KEY` | Yes | - | API key for Google Gemini model generation and embedding functions |
+| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | The public base URL of the client application |
 
 ---
 
-## Authentication & Roles
+## 🧭 App Routing & Page Matrix
 
-- **Supabase Auth** with cookie-based SSR (`middleware.ts` refreshes sessions).
-- **Shopper** — default role; access to shop, concierge, checkout, profile.
-- **Merchant** — set `user_metadata.role = 'merchant'` at signup; redirected to `/seller/dashboard`.
-- **Guest browsing** — `/shop`, `/pdp`, `/landing` are public; concierge and checkout require login.
+The consumer and merchant platforms are divided into separate layout routes:
 
----
-
-## API Reference (Core)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/chat` | POST | Streamed agent; body: `{ messages, chatId?, mock? }` |
-| `/api/admin/ingest` | POST | Multipart: `title`, `price`, `sku`, `images[]` (authenticated seller) |
-| `/api/orders` | POST/GET | Order placement and listing |
-
----
-
-## Scripts
-
-| Command | Purpose |
-|---------|---------|
-| `npm run dev` | Development server |
-| `npm run build` | Production build |
-| `npm run lint` | ESLint |
-| `npx tsx scripts/generate-embeddings.ts` | Backfill `product_embeddings` for PENDING/FAILED products |
-| `npx tsx scripts/list-models.ts` | List available Google embedding models |
-| `npx tsx scripts/test-embedding-dim.ts` | Verify embedding dimensionality |
+| Route | Role Access | Description |
+|---|---|---|
+| **`/landing`** | Public | Editorial brand entry page |
+| **`/shop`** | Public | Grid feed showcasing active product inventory |
+| **`/pdp/[itemId]`** | Public | Product details page with AI-powered lookbook suggest |
+| **`/concierge`** | Customer (Auth) | Immersive full-screen Vestira Concierge chat canvas & Generative UI |
+| **`/login` / `/register`** | Public | Authentication endpoints |
+| **`/onboarding/style-persona`**| Customer (Auth) | Style onboarding questionnaire to calibrate user profiles |
+| **`/seller/dashboard`** | Merchant (Auth) | Product ingestion pipeline and store metrics |
+| **`/seller/inventory`** | Merchant (Auth) | Raw catalog data grids |
+| **`/seller/ingestion`** | Merchant (Auth) | Vision-AI media processing engine for new catalog items |
 
 ---
 
-## Success Criteria (MVP)
+## 👥 User Roles & Authentication
 
-A user should be able to:
+The application implements role-based layouts and access boundaries using Supabase Auth:
 
-1. Describe fashion needs in natural language.
-2. Upload an image for visual discovery.
-3. Receive curated recommendations with editorial commentary.
-4. See dynamic product UI in the concierge showcase—not only plain text.
-5. Check real-time inventory and sizes via the agent.
-6. Build outfit looks and compare products in chat.
-7. Add items to the bag and complete checkout in the customer app.
+1. **Shoppers (Default):** Sign up via `/register`. This role gives you access to the store, cart checkout, style onboarding, and the `/concierge` styling room.
+2. **Merchants (Sellers):** To access the `/seller` dashboards, register an account and update your user metadata database record to define your role:
+   * **Setup:** Set the `role` field inside the user metadata JSON payload to `'merchant'` (e.g. `user_metadata.role = 'merchant'`).
+   * **Redirect:** Upon logging in, merchants are automatically redirected to `/seller/dashboard`.
 
 ---
 
-## Roadmap (Not Yet in Repo)
+## 📜 Development Scripts
 
-The architecture spec references capabilities planned for later iterations:
+You can execute workspace commands directly from the root directory:
 
-- **Trigger.dev** (or similar) for async embedding refresh and external inventory sync
-- **Partial Prerendering** on Vercel canary channel
-- **Monorepo** split (currently a single Next.js app: `vestira-next` in `package.json`)
-- **Analytics service** for search and recommendation telemetry
-- **Demo video** — technical walkthrough of agentic logic and HNSW tuning
-
----
-
-## Related Documentation
-
-- [`PROJECT_ANTIGRAVITY_SPEC.md`](./PROJECT_ANTIGRAVITY_SPEC.md) — Design system, layouts, route matrix
-- [`supabase/migrations/`](./supabase/migrations/) — Source of truth for schema and search RPCs
-- [`.agents/skills/supabase/`](./.agents/skills/supabase/) — Supabase agent skill for contributors
+| Script | Command | Purpose |
+|---|---|---|
+| **`npm run dev`** | `npm run dev --workspace=web` | Starts the Next.js app in development mode |
+| **`npm run build`** | `npm run build --workspace=web` | Compiles a production bundle of the Next.js app |
+| **`npm run lint`** | `npm run lint --workspace=web` | Runs ESLint diagnostics |
+| **`generate-embeddings`**| `npx tsx scripts/generate-embeddings.ts` | Calculates text and vision embeddings for pending products |
+| **`insert-seeds`** | `npx tsx scripts/insert-seeded-products.ts` | Utilities to insert additional products manually |
+| **`list-models`** | `npx tsx scripts/list-models.ts` | Prints list of available Gemini/Google models |
 
 ---
 
-## License
+## 🎨 Architecture Specifications
 
-Private project — all rights reserved unless otherwise specified by the repository owner.
+For granular details regarding typography, custom CSS color variables (e.g., Linen `#FAF0E6` vs Obsidian `#09090B`), spacing guidelines, and RSC boundary configurations, consult:
+* **[PROJECT_ANTIGRAVITY_SPEC.md](./PROJECT_ANTIGRAVITY_SPEC.md)** - System Architecture and Design Contract
+* **[supabase/migrations/](./supabase/migrations/)** - SQL source files detailing the database schema and RLS policies

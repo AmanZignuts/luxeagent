@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { Input, Combobox } from "@/components/ui";
+import Select, { components } from "react-select";
+import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,12 +103,108 @@ const ProductCard = React.memo(({ product }: { product: CatalogProduct }) => (
 ));
 ProductCard.displayName = "ProductCard";
 
+// ── react-select styling & custom components ───────────────────────────────
+
+const selectCustomStyles = {
+  control: (provided: any, state: any) => ({
+    ...provided,
+    backgroundColor: "var(--color-surface-white, #FFFFFF)",
+    borderColor: state.isFocused ? "#09090B" : "#E4E4E7",
+    boxShadow: "none",
+    borderRadius: "0.375rem",
+    paddingLeft: "0.5rem",
+    paddingRight: "2.5rem", // leave space for absolute search button
+    height: "2.25rem", // ~36px
+    minHeight: "2.25rem",
+    fontFamily: "var(--font-sans), sans-serif",
+    fontSize: "0.75rem",
+    "&:hover": {
+      borderColor: "#09090B"
+    }
+  }),
+  valueContainer: (provided: any) => ({
+    ...provided,
+    padding: "0"
+  }),
+  input: (provided: any) => ({
+    ...provided,
+    margin: "0",
+    color: "#09090B"
+  }),
+  placeholder: (provided: any) => ({
+    ...provided,
+    color: "rgba(9, 9, 11, 0.4)"
+  }),
+  menu: (provided: any) => ({
+    ...provided,
+    backgroundColor: "#FFFFFF",
+    border: "1px solid #E4E4E7",
+    borderRadius: "0.375rem",
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+    zIndex: 99,
+    overflow: "hidden"
+  }),
+  menuList: (provided: any) => ({
+    ...provided,
+    padding: "0"
+  })
+};
+
+const selectCustomComponents = {
+  DropdownIndicator: () => null,
+  IndicatorSeparator: () => null,
+  Menu: (props: any) => {
+    const { selectProps } = props;
+    if (!selectProps.inputValue || selectProps.inputValue.trim().length === 0) {
+      return null;
+    }
+    return <components.Menu {...props} />;
+  },
+  Option: (props: any) => {
+    const { data, innerRef, innerProps, isFocused } = props;
+    const item = data.product;
+    return (
+      <div
+        ref={innerRef}
+        {...innerProps}
+        className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors border-b border-muted-zinc/10 last:border-none ${
+          isFocused ? "bg-tint-champagne/70 font-semibold" : "hover:bg-tint-champagne/40 bg-surface-white"
+        }`}
+      >
+        <img src={item.imageUrl} alt={item.title} className="w-8 h-8 rounded object-cover border border-muted-zinc/20 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="font-serif text-[11px] font-semibold text-obsidian-velvet truncate">{item.title}</p>
+          <p className="font-sans text-[8px] text-obsidian-velvet/50 uppercase tracking-wider truncate">
+            {item.sku}{item.material ? ` — ${item.material}` : ""}
+          </p>
+        </div>
+        <span className="font-sans text-[10px] font-bold text-obsidian-velvet shrink-0">${item.price}</span>
+      </div>
+    );
+  },
+  LoadingMessage: () => (
+    <div className="px-4 py-6 flex flex-col items-center justify-center gap-2 text-obsidian-velvet/45 select-none bg-surface-white">
+      <svg className="animate-spin h-5 w-5 text-obsidian-velvet/40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span className="font-sans text-[10px] tracking-wider uppercase font-bold text-obsidian-velvet/30">Searching garments...</span>
+    </div>
+  ),
+  NoOptionsMessage: () => (
+    <div className="px-4 py-3 text-center text-xs font-sans text-obsidian-velvet/40 bg-surface-white">
+      No garments found
+    </div>
+  )
+};
+
 // ── Main Shell ───────────────────────────────────────────────────────────────
 
 export default function CatalogShell({ products, categories, sizes, activeFilters }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const capitalize = (str: string) => {
     if (!str) return "";
@@ -114,9 +213,71 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
 
   // Search input state — live typed value (dropdown only)
   const [searchQueryInput, setSearchQueryInput] = useState(activeFilters.q);
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<CatalogProduct[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+
+  // Local states for optimistic filtering updates
+  const [localCats, setLocalCats] = useState<string[]>(activeFilters.cats);
+  const [localSizes, setLocalSizes] = useState<string[]>(activeFilters.sizes);
+  const [localInStockOnly, setLocalInStockOnly] = useState<boolean>(activeFilters.inStockOnly);
+  const [localSortBy, setLocalSortBy] = useState<string>(activeFilters.sortBy);
+  const [localPriceMin, setLocalPriceMin] = useState<number | null>(activeFilters.priceMin);
+  const [localPriceMax, setLocalPriceMax] = useState<number | null>(activeFilters.priceMax);
+  const [localGender, setLocalGender] = useState<string | null>(activeFilters.gender);
+
+  // Synchronize local states with activeFilters from server
+  useEffect(() => {
+    setLocalCats(activeFilters.cats);
+    setLocalSizes(activeFilters.sizes);
+    setLocalInStockOnly(activeFilters.inStockOnly);
+    setLocalSortBy(activeFilters.sortBy);
+    setLocalPriceMin(activeFilters.priceMin);
+    setLocalPriceMax(activeFilters.priceMax);
+    setLocalGender(activeFilters.gender);
+  }, [activeFilters]);
+
+  // Fetch autocomplete suggestions server-side
+  useEffect(() => {
+    const query = searchQueryInput.trim();
+    if (!query) {
+      setAutocompleteSuggestions([]);
+      setIsSuggestionsLoading(false);
+      return;
+    }
+
+    setIsSuggestionsLoading(true);
+
+    const controller = new AbortController();
+    const handler = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (data.suggestions || []).map((item: any) => ({
+            value: item.id,
+            label: item.title,
+            product: item,
+          }));
+          setAutocompleteSuggestions(mapped);
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error("Autocomplete fetch error", err);
+          toast.error("Failed to load search suggestions");
+        }
+      } finally {
+        setIsSuggestionsLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(handler);
+      controller.abort();
+    };
+  }, [searchQueryInput]);
 
   // Mobile Filter Drawer
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -127,51 +288,22 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
   // Keep input in sync with server-driven activeFilters (e.g. back/forward nav)
   useEffect(() => {
     setSearchQueryInput(activeFilters.q);
-    setAutocompleteSuggestions([]);
-    setIsSearchFocused(false);
-    setActiveSuggestionIndex(-1);
   }, [activeFilters.q, pathname]);
 
   // Sync pending filters when drawer opens
   useEffect(() => {
     if (isFilterDrawerOpen) {
-      setPendingCategories(activeFilters.cats);
-      setPendingSizes(activeFilters.sizes);
-      setPendingInStockOnly(activeFilters.inStockOnly);
+      setPendingCategories(localCats);
+      setPendingSizes(localSizes);
+      setPendingInStockOnly(localInStockOnly);
     }
-  }, [isFilterDrawerOpen]);
+  }, [isFilterDrawerOpen, localCats, localSizes, localInStockOnly]);
 
   // Lock scroll when drawer open
   useEffect(() => {
     document.body.style.overflow = isFilterDrawerOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isFilterDrawerOpen]);
-
-  // Autocomplete suggestions from the already-fetched products list
-  useEffect(() => {
-    const query = searchQueryInput.trim().toLowerCase();
-    if (!query) { setAutocompleteSuggestions([]); return; }
-
-    const handler = setTimeout(() => {
-      const suggestions = products.filter((p) => {
-        if (p.title.toLowerCase().includes(query)) return true;
-        if (p.sku.toLowerCase().includes(query)) return true;
-        if (p.category.toLowerCase().includes(query)) return true;
-        if (p.rawCategory.toLowerCase().includes(query)) return true;
-        if (p.description?.toLowerCase().includes(query)) return true;
-        if (p.tags?.some((tag) => tag.toLowerCase().includes(query))) return true;
-        if (p.material && p.material.trim() && p.material.toLowerCase().includes(query)) return true;
-        return false;
-      });
-      // Suggestions pull from ALL products for a better autocomplete experience
-      // We pass ALL products from server but only filtered ones are displayed in grid
-      setAutocompleteSuggestions(suggestions.slice(0, 5));
-    }, 200);
-
-    return () => clearTimeout(handler);
-  }, [searchQueryInput, products]);
-
-  useEffect(() => { setActiveSuggestionIndex(-1); }, [searchQueryInput]);
 
   // ── URL helpers ─────────────────────────────────────────────────────────────
 
@@ -182,66 +314,51 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
       if (Array.isArray(value)) value.forEach((v) => params.append(key, v));
       else if (value !== null) params.set(key, value);
     }
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    });
   };
 
   const commitSearchToUrl = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value.trim()) params.set("q", value.trim());
     else params.delete("q");
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    });
   };
 
   const handleResetFilters = () => {
     setSearchQueryInput("");
-    router.push(pathname, { scroll: false });
+    setLocalCats([]);
+    setLocalSizes([]);
+    setLocalInStockOnly(false);
+    setLocalSortBy("featured");
+    setLocalPriceMin(null);
+    setLocalPriceMax(null);
+    setLocalGender(null);
+    startTransition(() => {
+      router.push(pathname, { scroll: false });
+    });
   };
 
   const handleCategoryToggle = (cat: string) => {
-    const next = activeFilters.cats.includes(cat)
-      ? activeFilters.cats.filter((c) => c !== cat)
-      : [...activeFilters.cats, cat];
+    const next = localCats.includes(cat)
+      ? localCats.filter((c) => c !== cat)
+      : [...localCats, cat];
+    setLocalCats(next);
     updateParam({ cat: next });
   };
 
   const handleSizeToggle = (sz: string) => {
-    const next = activeFilters.sizes.includes(sz)
-      ? activeFilters.sizes.filter((s) => s !== sz)
-      : [...activeFilters.sizes, sz];
+    const next = localSizes.includes(sz)
+      ? localSizes.filter((s) => s !== sz)
+      : [...localSizes, sz];
+    setLocalSizes(next);
     updateParam({ size: next });
   };
 
-  // ── Keyboard navigation ──────────────────────────────────────────────────────
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (autocompleteSuggestions.length > 0) {
-        setActiveSuggestionIndex((i) => (i < autocompleteSuggestions.length - 1 ? i + 1 : 0));
-      }
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (autocompleteSuggestions.length > 0) {
-        setActiveSuggestionIndex((i) => (i > 0 ? i - 1 : autocompleteSuggestions.length - 1));
-      }
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < autocompleteSuggestions.length) {
-        const item = autocompleteSuggestions[activeSuggestionIndex];
-        commitSearchToUrl(searchQueryInput);
-        router.push(`/pdp/${item.id}`);
-      } else {
-        commitSearchToUrl(searchQueryInput);
-      }
-      setIsSearchFocused(false);
-      setAutocompleteSuggestions([]);
-      e.currentTarget.blur();
-    } else if (e.key === "Escape") {
-      setIsSearchFocused(false);
-      setAutocompleteSuggestions([]);
-      e.currentTarget.blur();
-    }
-  };
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -259,21 +376,15 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
           </h1>
         </div>
         <div className="text-xs font-sans font-semibold uppercase tracking-wider">
-          <Link
-            href="/shop"
-            className="border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet bg-surface-white px-4 py-2.5 rounded-md transition-colors"
-          >
+          <Link href="/shop" className="border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet bg-surface-white px-4 py-2.5 rounded-md transition-colors">
             ← View Lookbook Campaigns
           </Link>
         </div>
       </div>
 
-      {/* Sticky Filter Bar */}
       <div className="sticky top-16 bg-warm-linen z-30 pt-4 pb-3 border-b border-muted-zinc/40 select-none">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-
-          {/* Left: Filter controls */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto lg:pr-4 lg:border-r lg:border-muted-zinc/40">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between lg:justify-start gap-3 w-full lg:w-auto lg:pr-4 lg:border-r lg:border-muted-zinc/40 lg:min-h-9">
             <div className="flex items-center gap-3">
               <span className="hidden lg:inline font-serif text-lg font-light tracking-tight text-obsidian-velvet">Filters</span>
               <button
@@ -293,16 +404,16 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
               >
                 Reset All
               </button>
-              {(activeFilters.priceMin !== null || activeFilters.priceMax !== null) && (
+              {(localPriceMin !== null || localPriceMax !== null) && (
                 <div className="flex items-center gap-1.5 bg-warm-linen border border-muted-zinc/60 px-2.5 py-1 rounded-full text-[9px] font-sans font-bold text-obsidian-velvet/60 uppercase">
-                  <span>Price: {activeFilters.priceMin !== null ? `₹${activeFilters.priceMin}` : ""} - {activeFilters.priceMax !== null ? `₹${activeFilters.priceMax}` : ""}</span>
-                  <button type="button" onClick={() => updateParam({ priceMin: null, priceMax: null })} className="hover:text-amber-800 transition-colors font-bold text-[9px] border-none bg-transparent cursor-pointer ml-1">✕</button>
+                  <span>Price: {localPriceMin !== null ? `₹${localPriceMin}` : ""} - {localPriceMax !== null ? `₹${localPriceMax}` : ""}</span>
+                  <button type="button" onClick={() => { setLocalPriceMin(null); setLocalPriceMax(null); updateParam({ priceMin: null, priceMax: null }); }} className="hover:text-amber-800 transition-colors font-bold text-[9px] border-none bg-transparent cursor-pointer ml-1">✕</button>
                 </div>
               )}
-              {activeFilters.gender && (
+              {localGender && (
                 <div className="flex items-center gap-1.5 bg-warm-linen border border-muted-zinc/60 px-2.5 py-1 rounded-full text-[9px] font-sans font-bold text-obsidian-velvet/60 uppercase">
-                  <span>Gender: {activeFilters.gender}</span>
-                  <button type="button" onClick={() => updateParam({ gender: null })} className="hover:text-amber-800 transition-colors font-bold text-[9px] border-none bg-transparent cursor-pointer ml-1">✕</button>
+                  <span>Gender: {localGender}</span>
+                  <button type="button" onClick={() => { setLocalGender(null); updateParam({ gender: null }); }} className="hover:text-amber-800 transition-colors font-bold text-[9px] border-none bg-transparent cursor-pointer ml-1">✕</button>
                 </div>
               )}
             </div>
@@ -312,35 +423,51 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
           </div>
 
           {/* Right: Count + Search + Sort */}
-          <div className="flex-1 flex items-center justify-between gap-3 w-full sm:w-auto min-w-0">
+          <div className="flex-1 flex items-center justify-between gap-3 w-full lg:w-auto min-w-0 lg:min-h-9">
             <span className="hidden lg:inline font-sans text-[9px] tracking-widest uppercase font-bold text-obsidian-velvet/40">
               Showing {products.length} unique garments
             </span>
 
-            {/* Search input */}
-            <div className="flex-1 min-w-0 max-w-[200px] sm:max-w-xs relative z-40">
+            {/* Search input with react-select */}
+            <div className="flex-1 min-w-0 lg:max-w-xs relative z-40">
               <div className="relative flex items-center">
-                <input
-                  type="text"
-                  placeholder="Search… press Enter to filter"
-                  value={searchQueryInput}
-                  onChange={(e) => setSearchQueryInput(e.target.value)}
-                  onFocus={() => setIsSearchFocused(true)}
-                  onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                  onKeyDown={handleKeyDown}
-                  className="w-full bg-surface-white border border-muted-zinc rounded-md pl-3 pr-16 py-2 text-xs font-sans text-obsidian-velvet placeholder-obsidian-velvet/40 focus:outline-none focus:border-obsidian-velvet transition-colors"
+                <Select
+                  options={autocompleteSuggestions}
+                  isLoading={isSuggestionsLoading}
+                  inputValue={searchQueryInput}
+                  onInputChange={(val, { action }) => {
+                    if (action === "input-change") {
+                      setSearchQueryInput(val);
+                    }
+                  }}
+                  onChange={(option: any) => {
+                    if (option) {
+                      router.push(`/pdp/${option.value}`);
+                    }
+                  }}
+                  filterOption={() => true}
+                  onKeyDown={(e: any) => {
+                    if (e.key === "Enter") {
+                      commitSearchToUrl(searchQueryInput);
+                    }
+                  }}
+                  placeholder="Search… press Enter"
+                  styles={selectCustomStyles}
+                  components={selectCustomComponents}
+                  className="w-full"
+                  value={null}
                 />
-                <div className="absolute right-1 flex items-center gap-1">
-                  {activeFilters.q && (
+                
+                {/* Search control buttons */}
+                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+                  {searchQueryInput && (
                     <button
                       type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         setSearchQueryInput("");
                         commitSearchToUrl("");
-                        setAutocompleteSuggestions([]);
                       }}
-                      className="w-5 h-5 flex items-center justify-center text-obsidian-velvet/40 hover:text-obsidian-velvet transition-colors rounded"
+                      className="w-5 h-5 flex items-center justify-center text-obsidian-velvet/40 hover:text-obsidian-velvet transition-colors rounded cursor-pointer border-none bg-transparent"
                       title="Clear search filter"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -350,13 +477,10 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
                   )}
                   <button
                     type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
+                    onClick={() => {
                       commitSearchToUrl(searchQueryInput);
-                      setIsSearchFocused(false);
-                      setAutocompleteSuggestions([]);
                     }}
-                    className="h-6 px-1.5 flex items-center justify-center bg-obsidian-velvet/8 hover:bg-obsidian-velvet/15 rounded text-obsidian-velvet/50 hover:text-obsidian-velvet transition-colors border border-muted-zinc/40"
+                    className="h-6 px-1.5 flex items-center justify-center bg-obsidian-velvet/8 hover:bg-obsidian-velvet/15 rounded text-obsidian-velvet/50 hover:text-obsidian-velvet transition-colors border border-muted-zinc/40 cursor-pointer"
                     title="Search (Enter)"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -365,47 +489,22 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
                   </button>
                 </div>
               </div>
-
-              {/* Suggestions Dropdown */}
-              {isSearchFocused && autocompleteSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 mt-1 bg-surface-white border border-muted-zinc shadow-lg rounded-md z-50 overflow-hidden max-h-60 overflow-y-auto">
-                  <div className="px-3 py-1.5 border-b border-muted-zinc/20 flex items-center justify-between">
-                    <span className="font-sans text-[8px] uppercase tracking-widest text-obsidian-velvet/35 font-bold">Quick Navigate</span>
-                    <span className="font-sans text-[8px] text-obsidian-velvet/30">Press Enter to filter catalog</span>
-                  </div>
-                  {autocompleteSuggestions.map((item, idx) => (
-                    <Link
-                      key={item.id}
-                      href={`/pdp/${item.id}`}
-                      onClick={() => commitSearchToUrl(searchQueryInput)}
-                      className={`flex items-center gap-3 px-3 py-2 transition-colors border-b border-muted-zinc/10 last:border-none ${
-                        idx === activeSuggestionIndex ? "bg-tint-champagne/70 font-semibold" : "hover:bg-tint-champagne/40"
-                      }`}
-                    >
-                      <img src={item.imageUrl} alt={item.title} className="w-8 h-8 rounded object-cover border border-muted-zinc/20 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-serif text-[11px] font-semibold text-obsidian-velvet truncate">{item.title}</p>
-                        <p className="font-sans text-[8px] text-obsidian-velvet/50 uppercase tracking-wider truncate">
-                          {item.sku}{item.material ? ` — ${item.material}` : ""}
-                        </p>
-                      </div>
-                      <span className="font-sans text-[10px] font-bold text-obsidian-velvet shrink-0">${item.price}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Sort */}
-            <select
-              value={activeFilters.sortBy}
-              onChange={(e) => updateParam({ sort: e.target.value === "featured" ? null : e.target.value })}
-              className="bg-surface-white border border-muted-zinc rounded-md px-3 py-1.5 text-xs font-sans text-obsidian-velvet focus:outline-none focus:border-obsidian-velvet cursor-pointer select-none"
-            >
-              <option value="featured">Sort: Featured</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-            </select>
+            <Combobox
+              options={[
+                { label: "Sort: Featured", value: "featured" },
+                { label: "Price: Low to High", value: "price-low" },
+                { label: "Price: High to Low", value: "price-high" },
+              ]}
+              value={localSortBy}
+              onChange={(val) => {
+                setLocalSortBy(val);
+                updateParam({ sort: val === "featured" ? null : val });
+              }}
+              className="bg-surface-white border-muted-zinc px-3 py-1.5 text-xs w-auto min-w-[150px] h-9 flex items-center justify-between"
+            />
           </div>
         </div>
       </div>
@@ -424,7 +523,7 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
                   <label key={cat} className="flex items-center gap-2.5 font-sans text-xs text-obsidian-velvet/80 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={activeFilters.cats.includes(cat)}
+                      checked={localCats.includes(cat)}
                       onChange={() => handleCategoryToggle(cat)}
                       className="w-3.5 h-3.5 border border-muted-zinc rounded accent-obsidian-velvet cursor-pointer"
                     />
@@ -443,7 +542,7 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
                   <label key={sz} className="flex items-center gap-2.5 font-sans text-xs text-obsidian-velvet/80 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={activeFilters.sizes.includes(sz)}
+                      checked={localSizes.includes(sz)}
                       onChange={() => handleSizeToggle(sz)}
                       className="w-3.5 h-3.5 border border-muted-zinc rounded accent-obsidian-velvet cursor-pointer"
                     />
@@ -459,8 +558,12 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
             <label className="flex items-center gap-2.5 font-sans text-xs text-obsidian-velvet/80 cursor-pointer">
               <input
                 type="checkbox"
-                checked={activeFilters.inStockOnly}
-                onChange={() => updateParam({ inStock: activeFilters.inStockOnly ? null : "1" })}
+                checked={localInStockOnly}
+                onChange={() => {
+                  const next = !localInStockOnly;
+                  setLocalInStockOnly(next);
+                  updateParam({ inStock: next ? "1" : null });
+                }}
                 className="w-3.5 h-3.5 border border-muted-zinc rounded accent-obsidian-velvet cursor-pointer"
               />
               <span>In Stock Only</span>
@@ -470,7 +573,27 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
 
         {/* Products */}
         <section className="col-span-12 lg:col-span-9 pb-20">
-          {products.length === 0 ? (
+          {isPending ? (
+            /* ── Loading skeleton shown instantly on filter click ── */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="w-full flex">
+                  <div className="bg-surface-white border border-muted-zinc rounded-xl flex flex-row gap-4 p-4 h-36 items-center sm:flex-col sm:h-[400px] sm:p-6 w-full animate-pulse">
+                    <div className="bg-muted-zinc/30 rounded-lg h-28 w-28 shrink-0 sm:w-full sm:flex-1 sm:min-h-[180px]" />
+                    <div className="flex-1 min-w-0 flex flex-col justify-between h-full sm:h-auto sm:w-full space-y-2">
+                      <div className="space-y-2">
+                        <div className="h-2 bg-muted-zinc/30 rounded w-3/4" />
+                        <div className="h-3.5 bg-muted-zinc/40 rounded w-full" />
+                        <div className="h-2 bg-muted-zinc/20 rounded w-1/2" />
+                        <div className="hidden sm:block h-5 bg-muted-zinc/20 rounded w-24 mt-2" />
+                      </div>
+                      <div className="h-4 bg-muted-zinc/30 rounded w-16" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
             <div className="border border-dashed border-muted-zinc rounded-xl p-16 text-center bg-surface-white/40">
               <p className="font-serif text-lg text-obsidian-velvet/85 mb-1">No items match your active filters</p>
               <p className="font-sans text-xs text-obsidian-velvet/40">
@@ -559,29 +682,35 @@ export default function CatalogShell({ products, categories, sizes, activeFilter
             </div>
 
             <div className="border-t border-muted-zinc/60 pt-4 space-y-2 bg-surface-white">
-              <button
-                type="button"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete("cat");
-                  params.delete("size");
-                  if (pendingInStockOnly) params.set("inStock", "1"); else params.delete("inStock");
-                  pendingCategories.forEach((c) => params.append("cat", c));
-                  pendingSizes.forEach((s) => params.append("size", s));
-                  router.push(`${pathname}?${params.toString()}`, { scroll: false });
-                  setIsFilterDrawerOpen(false);
-                }}
-                className="w-full bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90 font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer border-none"
-              >
-                Apply Filters
-              </button>
-              <button
-                type="button"
-                onClick={() => { setPendingCategories([]); setPendingSizes([]); setPendingInStockOnly(false); }}
-                className="w-full bg-surface-white border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer"
-              >
-                Clear All Pending
-              </button>
+               <button
+                 type="button"
+                 onClick={() => {
+                   setLocalCats(pendingCategories);
+                   setLocalSizes(pendingSizes);
+                   setLocalInStockOnly(pendingInStockOnly);
+
+                   const params = new URLSearchParams(searchParams.toString());
+                   params.delete("cat");
+                   params.delete("size");
+                   if (pendingInStockOnly) params.set("inStock", "1"); else params.delete("inStock");
+                   pendingCategories.forEach((c) => params.append("cat", c));
+                   pendingSizes.forEach((s) => params.append("size", s));
+                   startTransition(() => {
+                     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+                   });
+                   setIsFilterDrawerOpen(false);
+                 }}
+                 className="w-full bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90 font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer border-none"
+               >
+                 Apply Filters
+               </button>
+               <button
+                 type="button"
+                 onClick={() => { setPendingCategories([]); setPendingSizes([]); setPendingInStockOnly(false); }}
+                 className="w-full bg-surface-white border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet font-sans font-semibold text-xs rounded-md py-2.5 transition-colors cursor-pointer"
+               >
+                 Clear All Pending
+               </button>
             </div>
           </div>
         </>

@@ -135,7 +135,7 @@ export function BagDrawer({ isOpen, onClose, onCheckout }: BagDrawerProps) {
                   </div>
                   <div className="text-right space-y-1">
                     <span className="font-sans text-xs font-semibold block text-obsidian-velvet">
-                      ${item.price}
+                      ₹{item.price}
                     </span>
                     <button
                       type="button"
@@ -158,7 +158,7 @@ export function BagDrawer({ isOpen, onClose, onCheckout }: BagDrawerProps) {
           <div className="space-y-2 text-xs">
             <div className="flex justify-between font-sans text-obsidian-velvet/60">
               <span>Subtotal Curation</span>
-              <span className="font-semibold text-obsidian-velvet">${subtotal.toFixed(2)}</span>
+              <span className="font-semibold text-obsidian-velvet">₹{subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-sans text-obsidian-velvet/60">
               <span>Carbon-Neutral Courier</span>
@@ -166,7 +166,7 @@ export function BagDrawer({ isOpen, onClose, onCheckout }: BagDrawerProps) {
             </div>
             <div className="flex justify-between items-center text-obsidian-velvet border-t border-muted-zinc/40 pt-2">
               <span className="font-serif text-sm">Total Curation Capital</span>
-              <span className="font-sans text-sm font-bold">${subtotal.toFixed(2)}</span>
+              <span className="font-sans text-sm font-bold">₹{subtotal.toFixed(2)}</span>
             </div>
           </div>
 

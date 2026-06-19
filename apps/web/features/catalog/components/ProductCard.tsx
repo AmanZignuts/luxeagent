@@ -53,7 +53,7 @@ export const ProductCard = React.memo(({ product }: { product: CatalogProduct })
             Sizes: {product.sizes?.length > 0 ? product.sizes.slice(0, 3).join(",") + (product.sizes.length > 3 ? "..." : "") : "M"}
           </span>
           <span className="font-sans text-xs sm:text-sm font-bold text-obsidian-velvet">
-            ${product.price}
+            ₹{product.price}
           </span>
         </div>
       </div>

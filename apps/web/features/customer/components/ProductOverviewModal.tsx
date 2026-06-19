@@ -73,7 +73,7 @@ export function ProductOverviewModal({ product, onClose }: ProductOverviewModalP
               {product.title}
             </h4>
             <span className="font-sans text-sm font-bold text-obsidian-velvet flex-shrink-0">
-              ${product.price}
+              ₹{product.price}
             </span>
           </div>
 

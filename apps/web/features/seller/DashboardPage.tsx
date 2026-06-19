@@ -28,7 +28,7 @@ export default function SellerDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // ── Metric values ────────────────────────────────────────────────────────────
-  const [totalRevenue, setTotalRevenue] = useState("$0.00");
+  const [totalRevenue, setTotalRevenue] = useState("₹0.00");
   const [activeOrdersCount, setActiveOrdersCount] = useState("0 Orders");
   const [pendingCount, setPendingCount] = useState("0");
   const [catalogueSize, setCatalogueSize] = useState("0 Products");
@@ -75,7 +75,7 @@ export default function SellerDashboardPage() {
           .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
 
         setTotalRevenue(
-          `$${revenue.toLocaleString("en-US", {
+          `₹${revenue.toLocaleString("en-IN", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`
@@ -129,7 +129,7 @@ export default function SellerDashboardPage() {
         const pts = xs.map((x, i) => ({
           cx: x,
           cy: getY(buckets[i]),
-          label: `$${buckets[i].toFixed(0)}`,
+          label: `₹${buckets[i].toFixed(0)}`,
         }));
 
         const pathD = pts
@@ -292,7 +292,7 @@ export default function SellerDashboardPage() {
               {chartData.points.map((pt, i) => (
                 <g key={i}>
                   <circle cx={pt.cx} cy={pt.cy} r="3.5" fill="#09090B" />
-                  {pt.label !== "$0" && (
+                  {pt.label !== "₹0" && (
                     <text
                       x={pt.cx}
                       y={pt.cy - 9}

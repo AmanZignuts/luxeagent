@@ -70,7 +70,7 @@ export function DashboardRecentOrders({
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="font-sans text-xs font-semibold text-obsidian-velvet">
-                        ${order.total.toFixed(2)}
+                        ₹{order.total.toFixed(2)}
                       </p>
                       <p className="font-sans text-[9px] text-obsidian-velvet/40 mt-0.5">
                         {order.date}

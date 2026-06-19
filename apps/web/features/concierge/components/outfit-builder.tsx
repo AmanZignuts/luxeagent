@@ -67,6 +67,17 @@ export function OutfitBuilder({
         return;
       }
 
+      // If item already has sizes pre-populated (e.g. from outfit swap pre-fetch)
+      if (item.sizes && item.sizes.length > 0) {
+        fetchedIdsRef.current.add(item.id);
+        setDbSizes((prev) => ({ ...prev, [item.id]: item.sizes! }));
+        setSelectedSizes((prev) => {
+          if (prev[item.id]) return prev;
+          return { ...prev, [item.id]: item.sizes![0] };
+        });
+        return;
+      }
+
       fetchedIdsRef.current.add(item.id);
       setLoadingSizes((prev) => ({ ...prev, [item.id]: true }));
 
@@ -259,7 +270,7 @@ export function OutfitBuilder({
           const isAdded = addedItems[item.id];
           const catKey = item.category?.toLowerCase().replace(/\s+/g, "");
           const sizesToRender = dbSizes[item.id] !== undefined ? dbSizes[item.id] : item.sizes;
-          const isSizeLoading = sizesToRender === undefined || loadingSizes[item.id];
+          const isSizeLoading = sizesToRender === undefined;
 
           return (
             <div key={item.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-warm-linen/20 transition-colors group">
@@ -293,7 +304,13 @@ export function OutfitBuilder({
 
                 {/* Inline size selector buttons */}
                 <div className="mt-1.5 flex flex-col gap-1">
-                  {isSizeLoading ? null : sizesToRender.length > 0 ? (
+                  {isSizeLoading ? (
+                    <div className="h-[18px] flex items-center gap-1.5">
+                      <div className="w-8 h-[18px] bg-warm-linen/40 animate-pulse rounded border border-muted-zinc/30" />
+                      <div className="w-8 h-[18px] bg-warm-linen/40 animate-pulse rounded border border-muted-zinc/30" />
+                      <div className="w-8 h-[18px] bg-warm-linen/40 animate-pulse rounded border border-muted-zinc/30" />
+                    </div>
+                  ) : sizesToRender.length > 0 ? (
                     <>
                       <div className="flex flex-wrap gap-1.5">
                         {sizesToRender.map((sz) => {

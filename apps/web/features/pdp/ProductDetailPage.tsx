@@ -278,7 +278,7 @@ export default function ProductDetailPage() {
             </h1>
             <div className="flex items-center justify-between mt-4">
               <span className="font-sans text-lg font-semibold text-obsidian-velvet">
-                ${product.price}
+                ₹{product.price}
               </span>
               <span className={`border px-3 py-1 rounded-sm text-[10px] font-sans font-semibold tracking-wider uppercase ${isOutOfStock ? 'bg-red-50 border-red-200 text-red-750' : 'bg-surface-white border-muted-zinc text-obsidian-velvet/60'}`}>
                 {isOutOfStock ? 'Sold Out' : 'Ready to Order'}

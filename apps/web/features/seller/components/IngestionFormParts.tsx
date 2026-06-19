@@ -85,9 +85,9 @@ export function BasicInfoFields({ register, errors, watch, setValue, isSaving, c
             placeholder="Select category..."
           />
         </FormField>
-        <FormField label="Price (USD)" error={errors.price?.message}>
+        <FormField label="Price (INR)" error={errors.price?.message}>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-sans text-sm text-obsidian-velvet/40">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-sans text-sm text-obsidian-velvet/40">₹</span>
             <Input type="number" disabled={isSaving} error={!!errors.price} placeholder="0.00" className="pl-7" allowDecimals={true} step="0.01" {...register("price")} />
           </div>
         </FormField>

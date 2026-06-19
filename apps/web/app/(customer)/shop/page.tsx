@@ -231,7 +231,7 @@ export default function ShopFeedPage() {
                 </p>
               </div>
               <span className="font-sans text-sm font-semibold text-obsidian-velvet">
-                ${products[1]?.price}
+                ₹{products[1]?.price}
               </span>
             </div>
           </Link>
@@ -307,7 +307,7 @@ export default function ShopFeedPage() {
                 </p>
               </div>
               <span className="font-sans text-sm font-semibold text-obsidian-velvet">
-                ${products[2]?.price}
+                ₹{products[2]?.price}
               </span>
             </div>
           </Link>
@@ -344,7 +344,7 @@ export default function ShopFeedPage() {
                 </p>
               </div>
               <span className="font-sans text-sm font-semibold text-obsidian-velvet">
-                ${products[3]?.price}
+                ₹{products[3]?.price}
               </span>
             </div>
           </Link>

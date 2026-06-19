@@ -60,8 +60,8 @@ export function HeroSection() {
           {/* Right: Floating product cards */}
           <div className="hidden lg:flex flex-col gap-3 mb-12 hero-cards-animate">
             {[
-              { title: "100% Cotton Regular Fit Shirt", sku: "LA-SH-039", price: "$380", image: "/product_overshirt.png", category: "READY-TO-WEAR", id: "overshirt-1" },
-              { title: "Silk Crepe Slip Dress", sku: "LA-DR-094", price: "$680", image: "/product_dress.png", category: "EVENING WEAR", id: "dress-1" },
+              { title: "100% Cotton Regular Fit Shirt", sku: "LA-SH-039", price: "₹380", image: "/product_overshirt.png", category: "READY-TO-WEAR", id: "overshirt-1" },
+              { title: "Silk Crepe Slip Dress", sku: "LA-DR-094", price: "₹680", image: "/product_dress.png", category: "EVENING WEAR", id: "dress-1" },
             ].map((card) => (
               <Link
                 href={`/pdp/${card.id}`}

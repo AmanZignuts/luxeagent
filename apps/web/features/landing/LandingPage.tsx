@@ -8,7 +8,6 @@ import {
   CategoryGrid,
   FeaturedSection,
   FeaturesBanner,
-  Testimonials,
   LandingFooter,
 } from "./components";
 
@@ -60,7 +59,6 @@ export default function LandingPage() {
       />
 
       <FeaturesBanner />
-      <Testimonials />
       <LandingFooter />
     </div>
   );

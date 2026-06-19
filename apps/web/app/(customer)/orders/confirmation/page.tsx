@@ -273,7 +273,7 @@ export default function OrderConfirmationPage() {
                 </div>
                 <div className="text-right">
                   <span className="font-sans text-xs font-semibold text-obsidian-velvet">
-                    ${item.price.toFixed(2)}
+                    ₹{item.price.toFixed(2)}
                   </span>
                 </div>
               </div>

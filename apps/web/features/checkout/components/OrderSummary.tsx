@@ -73,7 +73,7 @@ export function OrderSummary({
             </div>
             <div className="flex flex-col items-end justify-between self-stretch py-1 flex-shrink-0">
               <span className="font-sans text-[13px] font-bold text-obsidian-velvet">
-                ${(item.price * (item.quantity || 1)).toFixed(2)}
+                ₹{(item.price * (item.quantity || 1)).toFixed(2)}
               </span>
               <div className="flex items-center gap-2 bg-surface-white border border-muted-zinc/50 rounded-md px-1.5 py-0.5 shadow-sm mt-auto">
                 <button
@@ -105,7 +105,7 @@ export function OrderSummary({
       <div className="border-t border-muted-zinc/50 pt-5 pb-6">
         <div className="flex items-center justify-between mb-5">
           <span className="font-sans text-base font-bold text-obsidian-velvet">Subtotal</span>
-          <span className="font-sans text-[17px] font-bold text-obsidian-velvet">${subtotal.toFixed(2)}</span>
+          <span className="font-sans text-[17px] font-bold text-obsidian-velvet">₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="space-y-3 font-sans text-xs font-medium text-obsidian-velvet/50">
           <div className="flex justify-between">
@@ -114,11 +114,11 @@ export function OrderSummary({
           </div>
           <div className="flex justify-between">
             <span>Delivery Service</span>
-            <span className="text-obsidian-velvet/80 font-bold">${deliveryFee.toFixed(2)}</span>
+            <span className="text-obsidian-velvet/80 font-bold">₹{deliveryFee.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span>Vat (0%)</span>
-            <span className="text-obsidian-velvet/80 font-bold">$0.00</span>
+            <span className="text-obsidian-velvet/80 font-bold">₹0.00</span>
           </div>
         </div>
       </div>
@@ -137,7 +137,7 @@ export function OrderSummary({
           onClick={onSubmit}
           className="w-full"
         >
-          Pay ${total.toFixed(2)}
+          Pay ₹{total.toFixed(2)}
         </Button>
       )}
       <Tooltip id="qty-tooltip" className="z-50" style={{ borderRadius: '6px', fontSize: '10px', padding: '6px 10px' }} />

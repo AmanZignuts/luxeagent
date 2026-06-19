@@ -233,21 +233,38 @@ export default function ConciergePageV2() {
       return;
     }
 
+    // Clear input and image previews synchronously to prevent perceived UI lag
+    setInput("");
+
     if (imageFile) {
-      const fileList = new DataTransfer();
-      fileList.items.add(imageFile);
-      const fileParts = await convertFileListToFileUIParts(fileList.files);
-      await sendMessage({
-        text: `[Image Upload] ${text || "Find me products similar to this image — analyze the style, color, and garment type"}`,
-        files: fileParts,
-      });
+      const activeFile = imageFile;
+      
+      // Clear image previews from UI immediately
       setImageFile(null);
       setImagePreview(null);
-      setTimeout(() => setImageBase64(null), 1000);
+
+      const fileList = new DataTransfer();
+      fileList.items.add(activeFile);
+
+      // Trigger the file conversion and message sending in background
+      void (async () => {
+        try {
+          const fileParts = await convertFileListToFileUIParts(fileList.files);
+          await sendMessage({
+            text: `[Image Upload] ${text || "Find me products similar to this image — analyze the style, color, and garment type"}`,
+            files: fileParts,
+          });
+        } catch (err) {
+          console.error("Failed to send visual search query:", err);
+          toast.error("Failed to send visual search query.");
+        } finally {
+          // Delay clearing base64 data to ensure transport reads it
+          setTimeout(() => setImageBase64(null), 1000);
+        }
+      })();
     } else {
-      await sendUserQuery(text);
+      sendUserQuery(text);
     }
-    setInput("");
   };
 
   return (

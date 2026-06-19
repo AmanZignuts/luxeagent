@@ -23,7 +23,7 @@ export function LandingHeader() {
       setIsLoggedIn(!!session);
     };
     checkAuth();
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setIsLoggedIn(!!session);
     });
@@ -43,11 +43,10 @@ export function LandingHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-surface-white/95 backdrop-blur-md border-b border-muted-zinc shadow-sm"
-          : "bg-surface-white border-b border-muted-zinc/50"
-      }`}
+      className={`sticky top-0 z-50 transition-all duration-300 ${scrolled
+        ? "bg-surface-white/95 backdrop-blur-md border-b border-muted-zinc shadow-sm"
+        : "bg-surface-white border-b border-muted-zinc/50"
+        }`}
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between gap-6">
         {/* Logo */}
@@ -61,7 +60,7 @@ export function LandingHeader() {
         <nav className="hidden lg:flex items-center gap-8 text-[10px] font-sans font-semibold tracking-widest uppercase text-obsidian-velvet/60">
           <Link href="/shop" className="hover:text-obsidian-velvet transition-colors pb-0.5 hover:border-b hover:border-obsidian-velvet">Lookbook</Link>
           <Link href="/shop/catalog" className="hover:text-obsidian-velvet transition-colors pb-0.5 hover:border-b hover:border-obsidian-velvet">Catalog</Link>
-          <Link href="/profile" className="hover:text-obsidian-velvet transition-colors pb-0.5 hover:border-b hover:border-obsidian-velvet">Calibrations</Link>
+          <Link href="/profile" className="hover:text-obsidian-velvet transition-colors pb-0.5 hover:border-b hover:border-obsidian-velvet">Profile</Link>
           <Link href="/orders" className="hover:text-obsidian-velvet transition-colors pb-0.5 hover:border-b hover:border-obsidian-velvet">Purchases</Link>
           <Link href="/concierge" className="text-amber-700/80 hover:text-amber-700 font-bold transition-colors">✦ AI Concierge</Link>
         </nav>
@@ -123,7 +122,7 @@ export function LandingHeader() {
         <div className="lg:hidden bg-surface-white border-t border-muted-zinc px-6 py-4 space-y-3 animate-[slideDown_0.2s_ease]">
           <Link href="/shop" className="block font-sans text-xs font-semibold uppercase tracking-widest text-obsidian-velvet/70 hover:text-obsidian-velvet py-1 transition-colors">Lookbook</Link>
           <Link href="/shop/catalog" className="block font-sans text-xs font-semibold uppercase tracking-widest text-obsidian-velvet/70 hover:text-obsidian-velvet py-1 transition-colors">Catalog</Link>
-          <Link href="/profile" className="block font-sans text-xs font-semibold uppercase tracking-widest text-obsidian-velvet/70 hover:text-obsidian-velvet py-1 transition-colors">Calibrations</Link>
+          <Link href="/profile" className="block font-sans text-xs font-semibold uppercase tracking-widest text-obsidian-velvet/70 hover:text-obsidian-velvet py-1 transition-colors">Profile</Link>
           <Link href="/orders" className="block font-sans text-xs font-semibold uppercase tracking-widest text-obsidian-velvet/70 hover:text-obsidian-velvet py-1 transition-colors">Purchases</Link>
           <Link href="/concierge" className="block font-sans text-xs font-semibold uppercase tracking-widest text-amber-700/80 hover:text-amber-700 py-1 transition-colors">✦ AI Concierge</Link>
           {isLoggedIn ? (

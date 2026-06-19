@@ -147,7 +147,7 @@ function CheckoutPageContent() {
           }
         }
       } catch (err) {
-        console.error("Failed to load user calibrations:", err);
+        console.error("Failed to load user details:", err);
       } finally {
         setLoadingProfile(false);
       }
@@ -265,11 +265,10 @@ function CheckoutPageContent() {
                 key={tab}
                 type="button"
                 onClick={() => tab === "customer" ? setActiveTab("customer") : handleContinueToPayment()}
-                className={`flex items-center gap-2 pb-3 border-b-2 font-sans text-sm font-bold w-1/2 justify-center transition-colors cursor-pointer ${
-                  activeTab === tab
+                className={`flex items-center gap-2 pb-3 border-b-2 font-sans text-sm font-bold w-1/2 justify-center transition-colors cursor-pointer ${activeTab === tab
                     ? "border-obsidian-velvet text-obsidian-velvet"
                     : "border-transparent text-obsidian-velvet/40 hover:text-obsidian-velvet/70"
-                }`}
+                  }`}
               >
                 <span className={`flex items-center justify-center w-4 h-4 rounded-full text-[10px] ${activeTab === tab ? "bg-obsidian-velvet text-surface-white" : "bg-muted-zinc/50 text-surface-white"}`}>
                   ✓

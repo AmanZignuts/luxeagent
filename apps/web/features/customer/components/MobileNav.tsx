@@ -42,18 +42,16 @@ export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn, on
             <Link
               href="/shop"
               onClick={onClose}
-              className={`hover:text-obsidian-velvet transition-colors pb-1 ${
-                pathname === "/shop" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
-              }`}
+              className={`hover:text-obsidian-velvet transition-colors pb-1 ${pathname === "/shop" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
+                }`}
             >
               Lookbook
             </Link>
             <Link
               href="/shop/catalog"
               onClick={onClose}
-              className={`hover:text-obsidian-velvet transition-colors pb-1 ${
-                pathname === "/shop/catalog" || pathname.startsWith("/pdp") ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
-              }`}
+              className={`hover:text-obsidian-velvet transition-colors pb-1 ${pathname === "/shop/catalog" || pathname.startsWith("/pdp") ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
+                }`}
             >
               Catalog
             </Link>
@@ -66,11 +64,10 @@ export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn, on
                   onProtectedNavigation?.("/profile");
                 }
               }}
-              className={`hover:text-obsidian-velvet transition-colors pb-1 ${
-                pathname === "/profile" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
-              }`}
+              className={`hover:text-obsidian-velvet transition-colors pb-1 ${pathname === "/profile" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
+                }`}
             >
-              Calibrations
+              Profile
             </Link>
             <Link
               href="/orders"
@@ -81,9 +78,8 @@ export function MobileNav({ isOpen, onClose, isLoggedIn, onSignOut, onSignIn, on
                   onProtectedNavigation?.("/orders");
                 }
               }}
-              className={`hover:text-obsidian-velvet transition-colors pb-1 ${
-                pathname === "/orders" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
-              }`}
+              className={`hover:text-obsidian-velvet transition-colors pb-1 ${pathname === "/orders" ? "text-obsidian-velvet font-bold pl-2 border-l-2 border-obsidian-velvet" : ""
+                }`}
             >
               Purchases
             </Link>

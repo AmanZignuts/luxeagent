@@ -65,12 +65,13 @@ export function isTrustedCatalogProduct(p: {
 }): boolean {
   const title = p.title ?? ''
   if (/quis|lorem|aspernatur|test product|placeholder/i.test(title)) return false
-  if (p.sku?.startsWith('LX-')) return true
+  if (p.sku?.startsWith('LX-') || p.sku?.startsWith('LA-')) return true
   const url = p.image_urls?.[0] ?? ''
   return (
     url.includes('unsplash.com') ||
     url.startsWith('/') ||
-    url.includes('images.')
+    url.includes('images.') ||
+    url.includes('supabase.co')
   )
 }
 

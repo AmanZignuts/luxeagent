@@ -19,6 +19,7 @@ interface ProductDetail {
   sourcing: string;
   imageUrls: string[];
   sizes: string[];
+  stockBySize?: Record<string, number>;
 }
 
 const STATIC_CATALOG: Record<string, ProductDetail> = {
@@ -33,7 +34,8 @@ const STATIC_CATALOG: Record<string, ProductDetail> = {
     construction: "Hand-finished flat fell seams, reinforced stress-points, and natural mother-of-pearl buttons. Crafted in our local atelier with meticulous attention to clean interior structural lines.",
     sourcing: "Woven in Florence, Italy from organic raw linen fibers certified by global ecological standards. Bleached organically without toxic synthetic chemicals to preserve the natural linen beige texture.",
     imageUrls: ["/product_overshirt.png"],
-    sizes: ["S", "M", "L", "XL"]
+    sizes: ["S", "M", "L", "XL"],
+    stockBySize: { "S": 10, "M": 5, "L": 0, "XL": 3 }
   },
   "trouser-1": {
     id: "trouser-1",
@@ -46,7 +48,8 @@ const STATIC_CATALOG: Record<string, ProductDetail> = {
     construction: "Unfinished hems for custom tailoring adjustments, silk-lined waistband detailing, side seam pockets, and rear button-through welt pockets. Built using classic bespoke tailoring methodologies.",
     sourcing: "Virgin wool ethically sheared and spun at the heritage Biella mills in Northern Italy. Sourced exclusively from farms committed to animal welfare and sustainable grassland regeneration pastures.",
     imageUrls: ["/product_trouser.png"],
-    sizes: ["S", "M", "L"]
+    sizes: ["S", "M", "L"],
+    stockBySize: { "S": 8, "M": 0, "L": 4 }
   },
   "dress-1": {
     id: "dress-1",
@@ -59,7 +62,8 @@ const STATIC_CATALOG: Record<string, ProductDetail> = {
     construction: "Fully lined with double-layered silk georgette panels, french seam interior finishing, and delicate, hand-applied strap anchoring loops to ensure architectural fluid drape stability.",
     sourcing: "Mulberry silk woven organically in heritage silk farms. Dyeds using natural botanical minerals to achieve our signature high-contrast deep obsidian ink shade with low carbon print footprint.",
     imageUrls: ["/product_dress.png"],
-    sizes: ["XS", "S", "M", "L", "XL"]
+    sizes: ["XS", "S", "M", "L", "XL"],
+    stockBySize: { "XS": 5, "S": 12, "M": 7, "L": 2, "XL": 4 }
   }
 };
 
@@ -132,7 +136,8 @@ export default function ProductDetailPage() {
             construction: aiMeta.construction || "Hand-finished flat fell seams, reinforced stress-points, and natural buttons. Crafted with meticulous attention to clean interior structural lines.",
             sourcing: aiMeta.sourcing || `Woven from fine ${data.material_composition || "textiles"} at certified heritage mills. Committed to eco-conscious luxury production.`,
             imageUrls: data.image_urls && data.image_urls.length > 0 ? data.image_urls : ["/product_overshirt.png"],
-            sizes: data.sizes && data.sizes.length > 0 ? data.sizes : ["S", "M", "L", "XL"]
+            sizes: data.sizes && data.sizes.length > 0 ? data.sizes : ["S", "M", "L", "XL"],
+            stockBySize: (data.stock_by_size as Record<string, number>) || {}
           };
           setProduct(details);
           if (details.sizes.length > 0) {
@@ -214,6 +219,7 @@ export default function ProductDetailPage() {
         material: product.material,
         category: product.category,
         imageUrl: product.imageUrls[0],
+        stockBySize: product.stockBySize,
       });
       toast.success(`Added ${product.title} (${activeSize}) to capsule bag.`);
     }, 800);
@@ -243,6 +249,9 @@ export default function ProductDetailPage() {
     }
   };
 
+  const selectedSizeStock = product?.stockBySize?.[activeSize] ?? 10;
+  const isOutOfStock = selectedSizeStock <= 0;
+
   const primaryImage = product.imageUrls[0] || "/product_overshirt.png";
 
   return (
@@ -271,8 +280,8 @@ export default function ProductDetailPage() {
               <span className="font-sans text-lg font-semibold text-obsidian-velvet">
                 ${product.price}
               </span>
-              <span className="bg-surface-white border border-muted-zinc px-3 py-1 rounded-sm text-[10px] font-sans font-semibold tracking-wider text-obsidian-velvet/60 uppercase">
-                Ready to Order
+              <span className={`border px-3 py-1 rounded-sm text-[10px] font-sans font-semibold tracking-wider uppercase ${isOutOfStock ? 'bg-red-50 border-red-200 text-red-750' : 'bg-surface-white border-muted-zinc text-obsidian-velvet/60'}`}>
+                {isOutOfStock ? 'Sold Out' : 'Ready to Order'}
               </span>
             </div>
           </div>
@@ -298,20 +307,29 @@ export default function ProductDetailPage() {
               Select Workspace Fit
             </span>
             <div className="flex gap-2">
-              {product.sizes.map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  onClick={() => setActiveSize(size)}
-                  className={`w-11 h-11 border rounded-md font-sans text-xs font-semibold flex items-center justify-center transition-all ${
-                    activeSize === size
-                      ? "bg-obsidian-velvet border-obsidian-velvet text-surface-white"
-                      : "border-muted-zinc bg-surface-white hover:border-obsidian-velvet/60 text-obsidian-velvet"
-                  }`}
-                >
-                  {size}
-                </button>
-              ))}
+              {product.sizes.map((size) => {
+                const stock = product.stockBySize?.[size] ?? 10;
+                const outOfStock = stock <= 0;
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setActiveSize(size)}
+                    className={`w-11 h-11 border rounded-md font-sans text-xs font-semibold flex flex-col items-center justify-center transition-all relative ${
+                      activeSize === size
+                        ? "bg-obsidian-velvet border-obsidian-velvet text-surface-white"
+                        : outOfStock
+                        ? "border-muted-zinc/40 bg-zinc-50 text-obsidian-velvet/30 line-through opacity-70"
+                        : "border-muted-zinc bg-surface-white hover:border-obsidian-velvet/60 text-obsidian-velvet"
+                    }`}
+                  >
+                    <span className="leading-none">{size}</span>
+                    <span className={`text-[7px] mt-0.5 leading-none ${activeSize === size ? "text-white/60" : "text-obsidian-velvet/40"}`}>
+                      {outOfStock ? "0" : stock}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -320,10 +338,12 @@ export default function ProductDetailPage() {
             <button
               type="button"
               onClick={handleButtonClick}
-              disabled={isAdding}
+              disabled={isAdding || (isOutOfStock && !isAlreadyInBag)}
               className={`flex-1 font-sans font-semibold text-xs uppercase tracking-wider rounded-md py-3.5 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3 shadow-none ${
                 isAlreadyInBag
                   ? "border border-obsidian-velvet bg-transparent text-obsidian-velvet hover:bg-obsidian-velvet/5"
+                  : isOutOfStock
+                  ? "bg-muted-zinc/40 text-obsidian-velvet/30 cursor-not-allowed border-none"
                   : "bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90"
               }`}
             >
@@ -334,6 +354,8 @@ export default function ProductDetailPage() {
                 </>
               ) : isAlreadyInBag ? (
                 <span>View Bag</span>
+              ) : isOutOfStock ? (
+                <span>Out of Stock</span>
               ) : (
                 <span>Add to Bag</span>
               )}
@@ -342,7 +364,12 @@ export default function ProductDetailPage() {
             <button
               type="button"
               onClick={handleBuyNow}
-              className="flex-1 border border-muted-zinc bg-surface-white text-obsidian-velvet hover:border-obsidian-velvet font-sans font-semibold text-xs uppercase tracking-wider rounded-md py-3.5 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isOutOfStock}
+              className={`flex-1 border font-sans font-semibold text-xs uppercase tracking-wider rounded-md py-3.5 active:scale-[0.99] transition-all flex items-center justify-center gap-2 ${
+                isOutOfStock
+                  ? "bg-zinc-50 border-muted-zinc/30 text-obsidian-velvet/20 cursor-not-allowed"
+                  : "border-muted-zinc bg-surface-white text-obsidian-velvet hover:border-obsidian-velvet cursor-pointer"
+              }`}
             >
               <span>Buy Now</span>
             </button>

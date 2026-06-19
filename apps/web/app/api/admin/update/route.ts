@@ -47,11 +47,18 @@ export async function POST(request: Request) {
     const price = parseFloat(formData.get('price') as string)
     const sku = formData.get('sku') as string
     const category = formData.get('category') as string
-    const brand = formData.get('brand') as string
+    const brand = formData.get('brand') as string || 'LuxeLabel'
     const description = formData.get('description') as string
     const material = formData.get('material') as string
     const stock = parseInt(formData.get('stock') as string, 10)
     const files = formData.getAll('images') as File[]
+
+    const subCategory = formData.get('sub_category') as string
+    const gender = formData.get('gender') as string
+    const tagsRaw = formData.get('tags') as string
+    const colorsRaw = formData.get('colors') as string
+    const imageCaption = formData.get('image_caption') as string
+    const imageUrlsRaw = formData.get('image_urls') as string
 
     if (!id || !title || isNaN(price) || !sku) {
       return NextResponse.json(
@@ -82,14 +89,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized: You do not own this product' }, { status: 403 })
     }
 
+    // ── Parse tags, colors, and image_urls if provided ───────────────
+    let tags: string[] = product.tags || []
+    if (tagsRaw) {
+      try {
+        tags = JSON.parse(tagsRaw)
+      } catch {
+        tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
+      }
+    }
+
+    let colors: string[] = product.colors || []
+    if (colorsRaw) {
+      try {
+        colors = JSON.parse(colorsRaw)
+      } catch {
+        colors = colorsRaw.split(',').map(c => c.trim()).filter(Boolean)
+      }
+    }
+
     let imageUrls = product.image_urls || []
+    if (imageUrlsRaw) {
+      try {
+        imageUrls = JSON.parse(imageUrlsRaw)
+      } catch {
+        imageUrls = imageUrlsRaw.split(',').map(u => u.trim()).filter(Boolean)
+      }
+    }
+
     let imageEmbedding: number[] | null = null
     let aiMetadata: any = (product.ai_metadata && typeof product.ai_metadata === 'object' && !Array.isArray(product.ai_metadata))
       ? product.ai_metadata
       : {}
 
+    const hasPreAnalyzedMetadata = !!category && !!description
+
     // ── Check if a new file is uploaded ──────────────────────────────
-    const hasNewImage = files && files.length > 0 && files[0].size > 0
+    const hasNewImage = files && files.length > 0 && files[0] instanceof File && files[0].size > 0
 
     if (hasNewImage) {
       // Ensure storage bucket exists
@@ -103,7 +139,7 @@ export async function POST(request: Request) {
         console.warn('[update] Could not ensure storage bucket exists:', e)
       }
 
-      imageUrls = []
+      const uploadedUrls: string[] = []
       for (const file of files.slice(0, 4)) {
         const fileBuffer = Buffer.from(await file.arrayBuffer())
         const fileName = `products/${sku}/${Date.now()}_${file.name.replace(/\s/g, '_')}`
@@ -124,16 +160,21 @@ export async function POST(request: Request) {
           .from('product-images')
           .getPublicUrl(uploadData.path)
 
-        imageUrls.push(publicUrl)
+        uploadedUrls.push(publicUrl)
+      }
+
+      if (uploadedUrls.length > 0) {
+        imageUrls = [...uploadedUrls, ...imageUrls]
       }
 
       if (imageUrls.length === 0) {
         return NextResponse.json({ error: 'Image upload failed' }, { status: 500 })
       }
 
-      // Call Gemini Vision to extract metadata for new image
-      const primaryImageUrl = imageUrls[0]
-      const visionPrompt = `You are analyzing a luxury fashion product image for a high-end e-commerce platform.
+      // If pre-analyzed metadata is not passed, run Gemini Vision on new image
+      if (!hasPreAnalyzedMetadata) {
+        const primaryImageUrl = imageUrls[0]
+        const visionPrompt = `You are analyzing a luxury fashion product image for a high-end e-commerce platform.
 
 Analyze this product image and return a JSON object with ONLY these exact fields:
 {
@@ -149,26 +190,39 @@ Analyze this product image and return a JSON object with ONLY these exact fields
 
 Return ONLY valid JSON. No markdown, no explanation.`
 
-      try {
-        const { text: visionResponse } = await generateText({
-          model: getModel('vision'),
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'image', image: primaryImageUrl },
-                { type: 'text', text: visionPrompt },
-              ],
-            },
-          ],
-        })
-        const cleaned = visionResponse.replace(/```json\n?|\n?```/g, '').trim()
-        aiMetadata = JSON.parse(cleaned)
-      } catch (e) {
-        console.warn('[update] Gemini Vision call failed. Keeping existing metadata or using defaults.', e)
+        try {
+          const { text: visionResponse } = await generateText({
+            model: getModel('vision'),
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'image', image: primaryImageUrl },
+                  { type: 'text', text: visionPrompt },
+                ],
+              },
+            ],
+          })
+          const cleaned = visionResponse.replace(/```json\n?|\n?```/g, '').trim()
+          aiMetadata = JSON.parse(cleaned)
+        } catch (e) {
+          console.warn('[update] Gemini Vision call failed. Keeping existing metadata or using defaults.', e)
+          aiMetadata = {
+            ...aiMetadata,
+            image_caption: title,
+          }
+        }
+      } else {
+        // Use passed metadata
         aiMetadata = {
-          ...aiMetadata,
-          image_caption: title,
+          description,
+          category,
+          sub_category: subCategory || product.sub_category || '',
+          gender: gender || product.gender || 'women',
+          colors,
+          tags,
+          material_composition: material || '',
+          image_caption: imageCaption || title,
         }
       }
 
@@ -181,18 +235,42 @@ Return ONLY valid JSON. No markdown, no explanation.`
         }
       }
     } else {
-      // Reuse existing image embedding
-      const { data: oldEmb } = await supabase
-        .from('product_embeddings')
-        .select('image_embedding')
-        .eq('product_id', product.id)
-        .maybeSingle()
-      
-      if (oldEmb && oldEmb.image_embedding) {
-        // Parse PG vector if returned as string (or array)
-        imageEmbedding = typeof oldEmb.image_embedding === 'string'
-          ? JSON.parse(oldEmb.image_embedding)
-          : oldEmb.image_embedding
+      // No new image file. Check if they updated metadata anyway
+      if (hasPreAnalyzedMetadata) {
+        aiMetadata = {
+          description,
+          category,
+          sub_category: subCategory || product.sub_category || '',
+          gender: gender || product.gender || 'women',
+          colors,
+          tags,
+          material_composition: material || '',
+          image_caption: imageCaption || title,
+        }
+
+        // Re-generate image embedding if caption changed
+        if (aiMetadata.image_caption && aiMetadata.image_caption !== (product.ai_metadata as any)?.image_caption) {
+          try {
+            imageEmbedding = await generateTextEmbedding(aiMetadata.image_caption)
+          } catch (e) {
+            console.warn('[update] Image embedding generation failed on caption change:', e)
+          }
+        }
+      }
+
+      // Reuse existing image embedding if not newly generated
+      if (!imageEmbedding) {
+        const { data: oldEmb } = await supabase
+          .from('product_embeddings')
+          .select('image_embedding')
+          .eq('product_id', product.id)
+          .maybeSingle()
+        
+        if (oldEmb && oldEmb.image_embedding) {
+          imageEmbedding = typeof oldEmb.image_embedding === 'string'
+            ? JSON.parse(oldEmb.image_embedding)
+            : oldEmb.image_embedding
+        }
       }
     }
 
@@ -229,6 +307,38 @@ Return ONLY valid JSON. No markdown, no explanation.`
       )
     }
 
+    const sizesRaw = formData.get('sizes') as string
+    const stockBySizeRaw = formData.get('stock_by_size') as string
+
+    let sizes: string[] = product.sizes || ['XS', 'S', 'M', 'L', 'XL']
+    if (sizesRaw) {
+      try {
+        sizes = JSON.parse(sizesRaw)
+      } catch {
+        sizes = sizesRaw.split(',').map(s => s.trim()).filter(Boolean)
+      }
+    }
+
+    let stockBySize: Record<string, number> = {}
+    if (stockBySizeRaw) {
+      try {
+        stockBySize = JSON.parse(stockBySizeRaw)
+      } catch {
+        console.error('Failed to parse stock_by_size JSON:', stockBySizeRaw)
+      }
+    }
+
+    // Fallback: If stock_by_size is empty but stock is provided, distribute stock
+    if (Object.keys(stockBySize).length === 0) {
+      const stockVal = isNaN(stock) ? 10 : stock
+      const stockXS = Math.floor(stockVal * 0.15)
+      const stockS = Math.floor(stockVal * 0.2)
+      const stockM = Math.floor(stockVal * 0.3)
+      const stockL = Math.floor(stockVal * 0.2)
+      const stockXL = stockVal - (stockXS + stockS + stockM + stockL)
+      stockBySize = { XS: stockXS, S: stockS, M: stockM, L: stockL, XL: stockXL }
+    }
+
     // ── Update database products table ──────────────────────────────
     const { error: updateError } = await supabase
       .from('products')
@@ -240,7 +350,8 @@ Return ONLY valid JSON. No markdown, no explanation.`
         category: category || null,
         brand: brand || 'LuxeLabel',
         material_composition: material || null,
-        stock_by_size: { M: isNaN(stock) ? 10 : stock },
+        sizes: sizes,
+        stock_by_size: stockBySize,
         image_urls: imageUrls,
         ai_metadata: aiMetadata as unknown as import('@/lib/supabase/types').Json,
         seller_id: user.id, // Transfers ownership if it was null

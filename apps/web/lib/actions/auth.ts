@@ -74,11 +74,11 @@ export async function registerAction(formData: FormData) {
 // ─────────────────────────────────────────────────────────────────────
 // LOGOUT
 // ─────────────────────────────────────────────────────────────────────
-export async function logoutAction() {
+export async function logoutAction(redirectTo: string = '/login') {
   const supabase = await createClient()
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
-  redirect('/login')
+  redirect(redirectTo)
 }
 
 // ─────────────────────────────────────────────────────────────────────

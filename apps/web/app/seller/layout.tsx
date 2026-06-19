@@ -6,6 +6,13 @@ import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { logoutAction } from "@/lib/actions/auth";
 import { SignOutModal } from "@/features/customer/components/SignOutModal";
+import {
+  LayoutDashboard,
+  Package,
+  PlusCircle,
+  ShoppingBag,
+  Settings,
+} from "lucide-react";
 
 export default function SellerLayout({
   children,
@@ -26,7 +33,7 @@ export default function SellerLayout({
     try {
       setIsSigningOut(true);
       toast.success("Successfully signed out. Hope to see you soon.");
-      await logoutAction();
+      await logoutAction('/seller/login');
     } finally {
       // No need to set false usually if it redirects, but good practice
       setIsSigningOut(false);
@@ -35,14 +42,15 @@ export default function SellerLayout({
   };
 
   const navLinks = [
-    { href: "/seller/dashboard", label: "Dashboard" },
-    { href: "/seller/inventory", label: "Inventory" },
-    { href: "/seller/ingestion", label: "Add New Product" },
-    { href: "/seller/orders", label: "Orders" },
-    { href: "/seller/settings", label: "Settings" },
+    { href: "/seller/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/seller/inventory", label: "Inventory", icon: Package },
+    { href: "/seller/ingestion", label: "Add New Product", icon: PlusCircle },
+    { href: "/seller/orders", label: "Orders", icon: ShoppingBag },
+    { href: "/seller/settings", label: "Settings", icon: Settings },
   ];
 
   const isAuthPage = pathname === '/seller/login' || pathname === '/seller/register';
+  const isIngestionPage = pathname?.startsWith('/seller/ingestion');
 
   // Auth pages get a clean full-screen layout — no sidebar
   if (isAuthPage) {
@@ -99,16 +107,18 @@ export default function SellerLayout({
           <nav className="space-y-1.5 flex flex-col">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
+              const Icon = link.icon;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3 py-2.5 rounded-md font-sans text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center justify-between group ${
+                  className={`px-3 py-2.5 rounded-md font-sans text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-3 group ${
                     isActive
                       ? "bg-obsidian-velvet text-surface-white"
                       : "text-obsidian-velvet/60 hover:bg-warm-linen/40 hover:text-obsidian-velvet"
                   }`}
                 >
+                  <Icon className="w-4.5 h-4.5 transition-transform duration-200 group-hover:scale-110 shrink-0" />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -163,17 +173,19 @@ export default function SellerLayout({
               <nav className="flex flex-col gap-4">
                 {navLinks.map((link) => {
                   const isActive = pathname === link.href;
+                  const Icon = link.icon;
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={`px-3 py-2.5 rounded-md font-sans text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center justify-between ${
+                      className={`px-3 py-2.5 rounded-md font-sans text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-3 group ${
                         isActive
                           ? "bg-obsidian-velvet text-surface-white font-bold"
                           : "text-obsidian-velvet/60 hover:bg-warm-linen/40 hover:text-obsidian-velvet"
                       }`}
                     >
+                      <Icon className="w-4.5 h-4.5 transition-transform duration-200 group-hover:scale-110 shrink-0" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -199,8 +211,12 @@ export default function SellerLayout({
       )}
 
       {/* Main Content Area (Spans remainder of screen, pl-0 on mobile/tablet, pl-[260px] on desktop) */}
-      <main className="pl-0 lg:pl-[260px] w-full min-h-screen relative z-10 flex flex-col pt-16 lg:pt-0">
-        <div className="p-6 sm:p-10 w-full flex-1 max-w-7xl mx-auto space-y-8 sm:space-y-10">
+      <main className={`pl-0 lg:pl-[260px] w-full min-h-screen relative z-10 flex flex-col pt-16 lg:pt-0 ${
+        isIngestionPage ? "lg:h-screen lg:max-h-screen lg:overflow-hidden" : ""
+      }`}>
+        <div className={`p-6 sm:p-10 w-full flex-1 max-w-7xl mx-auto space-y-8 sm:space-y-10 ${
+          isIngestionPage ? "lg:h-full lg:max-h-full lg:overflow-hidden lg:flex lg:flex-col" : ""
+        }`}>
           {children}
         </div>
       </main>

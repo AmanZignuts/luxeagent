@@ -15,20 +15,32 @@ import {
 import { ConciergeBagDrawer } from "@/app/(ai)/concierge/ConciergeBagDrawer";
 import { ChatPanel } from "./components/ChatPanel";
 import { ShowcasePanel } from "./components/ShowcasePanel";
+import { MobileShowcaseDrawer } from "./components/MobileShowcaseDrawer";
 import { ShowcaseState, SizePickerReturnState, canReturnFromSizePicker } from "./types";
+import { useImageUpload } from "./hooks/useImageUpload";
+import { useOutfitSwap } from "./hooks/useOutfitSwap";
+import { useShowcaseSync } from "./hooks/useShowcaseSync";
 
 export default function ConciergePageV2() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [chatId, setChatId] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const {
+    imagePreview,
+    imageFile,
+    imageBase64,
+    handleImageFile,
+    clearImage,
+    setImageFile,
+    setImagePreview,
+    setImageBase64,
+  } = useImageUpload();
 
   useEffect(() => {
     setChatId(crypto.randomUUID());
   }, []);
+
   const [input, setInput] = useState("");
   const [showcase, setShowcase] = useState<ShowcaseState>({ kind: "idle" });
   const [isMobileShowcaseOpen, setIsMobileShowcaseOpen] = useState(false);
@@ -42,7 +54,6 @@ export default function ConciergePageV2() {
   const showcaseRef = useRef(showcase);
   const [sizePickerLoading, setSizePickerLoading] = useState(false);
   const pendingSizeReturnRef = useRef<SizePickerReturnState | null>(null);
-  const [swappingOutfitSku, setSwappingOutfitSku] = useState<string | null>(null);
   const pinSizePickerRef = useRef(false);
   const pinOutfitShowcaseRef = useRef(false);
   const lastProcessedToolKeyRef = useRef<string | null>(null);
@@ -100,10 +111,6 @@ export default function ConciergePageV2() {
       console.error('[Concierge] useChat error:', error);
     }
   }, [error]);
-
-  useEffect(() => {
-    console.log('[Concierge] Messages updated:', messages.length, messages);
-  }, [messages]);
 
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -197,241 +204,24 @@ export default function ConciergePageV2() {
     showcaseRef.current = showcase;
   }, [showcase]);
 
-  const swapOutfitPiece = useCallback(async (item: StagedLookItem) => {
-    const current = showcaseRef.current;
-    if (current.kind !== "outfit_builder") return;
+  const { swappingOutfitSku, swapOutfitPiece } = useOutfitSwap({
+    showcase,
+    setShowcase,
+    showcaseRef,
+  });
 
-    setSwappingOutfitSku(item.sku);
-    try {
-      const otherTotal = current.look
-        .filter((i) => i.category !== item.category)
-        .reduce((sum, i) => sum + i.price, 0);
-
-      const res = await fetch("/api/outfit/swap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category: item.category,
-          occasion: current.occasion,
-          colorPalette: current.colorPalette,
-          excludeSkus: current.look.map((i) => i.sku),
-          totalBudgetMax: current.totalBudgetMax ?? null,
-          otherItemsTotal: otherTotal,
-        }),
-      });
-      const data = await res.json();
-
-      if (data.type !== "outfit_slot" || !data.item) {
-        toast.error("No other option for this slot with your current filters.");
-        return;
-      }
-
-      // Pre-fetch available sizes for the new item before completing the swap transition
-      const invRes = await fetch(`/api/inventory?sku=${encodeURIComponent(data.item.sku)}`);
-      const invData = await invRes.json();
-      if (invData.type !== "size_picker" || !invData.availableSizes) {
-        throw new Error("Inventory sizes unavailable for this suggestion.");
-      }
-      const availableSizes = invData.availableSizes.map((s: any) => s.size);
-
-      setShowcase((prev) => {
-        if (prev.kind !== "outfit_builder") return prev;
-        const newLook = prev.look.map((i) =>
-          i.category === item.category
-            ? {
-                id: data.item.id,
-                title: data.item.title,
-                sku: data.item.sku,
-                price: data.item.price,
-                category: data.item.category,
-                imageUrl: data.item.imageUrl,
-                colors: data.item.colors ?? [],
-                sizes: availableSizes,
-                brand: data.item.brand,
-              }
-            : i
-        );
-        return {
-          ...prev,
-          look: newLook,
-          totalPrice: newLook.reduce((s, i) => s + i.price, 0),
-        };
-      });
-      toast.success("Suggested another piece for this slot.");
-    } catch {
-      toast.error("Could not refresh this slot. Try again.");
-    } finally {
-      setSwappingOutfitSku(null);
-    }
-  }, []);
+  useShowcaseSync({
+    messages,
+    setShowcase,
+    pinSizePickerRef,
+    pinOutfitShowcaseRef,
+    pendingSizeReturnRef,
+    lastProcessedToolKeyRef,
+  });
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    if (pinSizePickerRef.current) return;
-    if (pinOutfitShowcaseRef.current) return;
-
-    if (messages.length <= 1) {
-      if (lastProcessedToolKeyRef.current !== null) {
-        lastProcessedToolKeyRef.current = null;
-        setShowcase({ kind: "idle" });
-      }
-      return;
-    }
-
-    const latestMessage = messages[messages.length - 1];
-    const hasActiveToolCall = latestMessage?.parts?.some(
-      (p: any) => (p.type === "dynamic-tool" || p.type?.startsWith("tool-")) && p.state !== "output-available" && p.state !== "done"
-    );
-
-    if (hasActiveToolCall) {
-      if (lastProcessedToolKeyRef.current !== "thinking") {
-        lastProcessedToolKeyRef.current = "thinking";
-        setShowcase({ kind: "thinking" });
-      }
-      return;
-    }
-
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      const toolParts = msg.parts?.filter(
-        (p: any) => p.type === "dynamic-tool" || p.type?.startsWith("tool-")
-      ) || [];
-
-      // Collect ALL completed product_carousel results from this message
-      // so that multiple catalog_search calls in the same turn are merged.
-      const carouselParts = toolParts.filter((p: any) => {
-        if (p.state !== "output-available" && p.state !== "done") return false;
-        return p.output?.type === "product_carousel";
-      });
-
-      if (carouselParts.length > 0) {
-        // Use the index of the last carousel part as the dedup key
-        const lastCarouselIdx = toolParts.lastIndexOf(carouselParts[carouselParts.length - 1]);
-        const key = `${msg.id}-${lastCarouselIdx}`;
-        if (lastProcessedToolKeyRef.current === key) return;
-        lastProcessedToolKeyRef.current = key;
-
-        // Merge all carousel products and sum totalFound
-        const mergedProducts = carouselParts.flatMap((p: any) => p.output.products ?? []);
-        const mergedTotalFound = carouselParts.reduce(
-          (sum: number, p: any) => sum + (p.output.totalFound ?? (p.output.products?.length ?? 0)),
-          0
-        );
-        const firstResult = (carouselParts[0] as any).output;
-
-        setShowcase({
-          kind: "product_carousel",
-          products: mergedProducts,
-          query: firstResult.query,
-          emptyMessage: firstResult.emptyMessage,
-          appliedFiltersLabel: carouselParts.length > 1 ? undefined : firstResult.appliedFilters?.label,
-          totalFound: mergedTotalFound,
-          appliedFilters: firstResult.appliedFilters,
-        });
-        return;
-      }
-
-      for (let j = toolParts.length - 1; j >= 0; j--) {
-        const part = toolParts[j] as any;
-        if (part.state !== "output-available" && part.state !== "done") continue;
-        const result = part.output;
-        if (!result) continue;
-        if (result.type === "product_carousel") continue; // already handled above
-
-        const key = `${msg.id}-${j}`;
-        if (lastProcessedToolKeyRef.current === key) return;
-
-        lastProcessedToolKeyRef.current = key;
-        if (result.type === "personalized_carousel") {
-          setShowcase({ kind: "personalized_carousel", products: result.products });
-          return;
-        }
-        if (result.type === "size_picker") {
-          setShowcase((prev) => {
-            const returnTo = prev.kind === "size_picker" && prev.returnTo ? prev.returnTo : canReturnFromSizePicker(prev) ? prev : pendingSizeReturnRef.current ?? undefined;
-            pendingSizeReturnRef.current = null;
-            return {
-              kind: "size_picker",
-              productId: result.productId,
-              title: result.title,
-              sku: result.sku,
-              price: prev.kind === "size_picker" ? prev.price : 0,
-              imageUrl: prev.kind === "size_picker" ? prev.imageUrl : undefined,
-              category: prev.kind === "size_picker" ? prev.category : undefined,
-              stockBySize: result.stockBySize,
-              availableSizes: result.availableSizes,
-              totalStock: result.totalStock,
-              isLowStock: result.isLowStock,
-              returnTo,
-            };
-          });
-          return;
-        }
-        if (result.type === "lookbook") {
-          setShowcase({ kind: "lookbook", occasion: result.occasion, colorPalette: result.colorPalette, look: result.look, totalPrice: result.totalPrice });
-          return;
-        }
-        if (result.type === "outfit_builder") {
-          pinOutfitShowcaseRef.current = true;
-          setShowcase({ kind: "outfit_builder", occasion: result.occasion, colorPalette: result.colorPalette, look: result.look ?? [], totalPrice: result.totalPrice ?? 0, totalBudgetMax: result.totalBudgetMax, emptyMessage: result.emptyMessage });
-          return;
-        }
-        if (result.type === "product_comparison") {
-          setShowcase({ kind: "product_comparison", productA: result.productA, productB: result.productB });
-          return;
-        }
-        if (result.type === "image_search_result") {
-          setShowcase({ kind: "image_search_result", imageDescription: result.imageDescription, products: result.products });
-          return;
-        }
-        if (result.type === "occasion_recommendation") {
-          setShowcase({ kind: "occasion_recommendation", occasion: result.occasion, products: result.products });
-          return;
-        }
-        if (result.type === "order_status") {
-          setShowcase({ kind: "order_status", orders: result.orders });
-          return;
-        }
-        if (result.type === "add_to_bag_confirm") {
-          setShowcase({ kind: "add_to_bag", item: result.item, message: result.message });
-          return;
-        }
-        if (result.type === "style_profile") {
-          setShowcase({ kind: "style_profile", displayName: result.displayName, styleTokens: result.styleTokens, preferredSize: result.preferredSize, budgetMin: result.budgetMin, budgetMax: result.budgetMax, preferredColors: result.preferredColors, preferredCategories: result.preferredCategories });
-          return;
-        }
-      }
-    }
-
-    if (lastProcessedToolKeyRef.current !== null) {
-      lastProcessedToolKeyRef.current = null;
-    }
-    setShowcase((prev) => prev.kind === "thinking" ? { kind: "idle" } : prev);
-  }, [messages]);
-
-  const handleImageFile = useCallback((file: File) => {
-    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error("Please upload a valid image file (JPEG, PNG, or WEBP)");
-      return;
-    }
-    const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
-    if (file.size > MAX_SIZE) {
-      toast.error("Image file size must be less than 5MB");
-      return;
-    }
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setImagePreview(dataUrl);
-      setImageBase64(dataUrl); // Store base64 for server-side image fingerprinting
-    };
-    reader.readAsDataURL(file);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -453,7 +243,6 @@ export default function ConciergePageV2() {
       });
       setImageFile(null);
       setImagePreview(null);
-      // Clear imageBase64 after a short delay so the transport picks it up for this request
       setTimeout(() => setImageBase64(null), 1000);
     } else {
       await sendUserQuery(text);
@@ -513,7 +302,6 @@ export default function ConciergePageV2() {
         </div>
 
         <div className="flex items-center gap-5">
-          {/* Mobile Styling Suite Toggle */}
           <button
             type="button"
             onClick={() => setIsMobileShowcaseOpen(!isMobileShowcaseOpen)}
@@ -555,10 +343,7 @@ export default function ConciergePageV2() {
           chatEndRef={chatEndRef}
           fileInputRef={fileInputRef}
           imagePreview={imagePreview}
-          onClearImage={() => {
-            setImagePreview(null);
-            setImageFile(null);
-          }}
+          onClearImage={clearImage}
           onImageFileSelect={handleImageFile}
         />
         <ShowcasePanel 
@@ -576,55 +361,22 @@ export default function ConciergePageV2() {
           onUploadClick={() => fileInputRef.current?.click()}
         />
 
-        {/* Mobile Showcase Drawer Overlay */}
-        {isMobileShowcaseOpen && (
-          <>
-            {/* Backdrop Mask */}
-            <div
-              onClick={() => setIsMobileShowcaseOpen(false)}
-              className="lg:hidden fixed inset-0 bg-obsidian-velvet/30 backdrop-blur-sm z-40 transition-opacity animate-in fade-in duration-200"
-            />
-
-            {/* Bottom Sheet Drawer (95% height) */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[95vh] bg-warm-linen rounded-t-2xl z-50 flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
-              {/* Elegant Drag Handle Indicator */}
-              <div className="flex-shrink-0 w-full pt-2 bg-surface-white">
-                <div className="w-10 h-1 bg-obsidian-velvet/15 rounded-full mx-auto" />
-              </div>
-
-              {/* Header for mobile styling suite */}
-              <header className="flex-shrink-0 bg-surface-white border-b border-muted-zinc/60 flex items-center justify-between px-6 pb-3 pt-1.5 h-12">
-                <span className="font-serif text-sm font-semibold tracking-tight text-obsidian-velvet">✦ Styling Suite</span>
-                <button
-                  type="button"
-                  onClick={() => setIsMobileShowcaseOpen(false)}
-                  className="w-14 h-7 border border-muted-zinc hover:border-obsidian-velvet text-obsidian-velvet flex items-center justify-center font-sans text-[9px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer bg-surface-white"
-                >
-                  Close
-                </button>
-              </header>
-              
-              {/* Mobile Showcase Content wrapper */}
-              <div className="flex-1 overflow-hidden relative">
-                <ShowcasePanel 
-                  showcase={showcase}
-                  sizePickerLoading={sizePickerLoading}
-                  handleShowcaseBack={handleShowcaseBack}
-                  openSizePickerForProduct={openSizePickerForProduct}
-                  append={append}
-                  openSizePickerForStagedItem={openSizePickerForStagedItem}
-                  swapOutfitPiece={swapOutfitPiece}
-                  swappingOutfitSku={swappingOutfitSku}
-                  sendUserQuery={sendUserQuery}
-                  bagCount={bagCount}
-                  openBag={openBag}
-                  isMobile={true}
-                  onUploadClick={() => fileInputRef.current?.click()}
-                />
-              </div>
-            </div>
-          </>
-        )}
+        <MobileShowcaseDrawer
+          isOpen={isMobileShowcaseOpen}
+          onClose={() => setIsMobileShowcaseOpen(false)}
+          showcase={showcase}
+          sizePickerLoading={sizePickerLoading}
+          handleShowcaseBack={handleShowcaseBack}
+          openSizePickerForProduct={openSizePickerForProduct}
+          append={append}
+          openSizePickerForStagedItem={openSizePickerForStagedItem}
+          swapOutfitPiece={swapOutfitPiece}
+          swappingOutfitSku={swappingOutfitSku}
+          sendUserQuery={sendUserQuery}
+          bagCount={bagCount}
+          openBag={openBag}
+          fileInputRef={fileInputRef}
+        />
       </div>
 
       <ConciergeBagDrawer />

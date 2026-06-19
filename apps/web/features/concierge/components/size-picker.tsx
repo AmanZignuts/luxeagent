@@ -45,6 +45,7 @@ export function SizePicker({
       material: "Atelier Sourced Fiber",
       category: category ?? "Ready-to-Wear",
       imageUrl: imageUrl ?? "",
+      stockBySize,
     });
 
     setIsAdded(true);

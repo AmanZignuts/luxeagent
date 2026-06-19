@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 export interface BagItem {
@@ -13,6 +14,7 @@ export interface BagItem {
   category: string;
   imageUrl?: string;
   quantity?: number;
+  stockBySize?: Record<string, number>;
 }
 
 interface BagContextType {
@@ -113,6 +115,58 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
     }
   }, [bagItems, userId, isInitialized]);
 
+  // Keep stock limits updated for all bag items in real-time
+  useEffect(() => {
+    if (!isInitialized || bagItems.length === 0) return;
+
+    let active = true;
+    async function updateStockLimits() {
+      try {
+        const dbItems = bagItems.filter(item => !item.id.startsWith("overshirt") && !item.id.startsWith("trouser") && !item.id.startsWith("dress"));
+        if (dbItems.length === 0) return;
+
+        const supabase = createClient();
+        const ids = dbItems.map(item => item.id);
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, stock_by_size")
+          .in("id", ids);
+
+        if (error) throw error;
+        if (!active || !data) return;
+
+        const stockMap = new Map<string, Record<string, number>>();
+        data.forEach(p => {
+          stockMap.set(p.id, (p.stock_by_size as Record<string, number>) || {});
+        });
+
+        setBagItems(prev => {
+          let changed = false;
+          const updated = prev.map(item => {
+            const latestStock = stockMap.get(item.id);
+            if (latestStock) {
+              const currentStockStr = JSON.stringify(item.stockBySize);
+              const latestStockStr = JSON.stringify(latestStock);
+              if (currentStockStr !== latestStockStr) {
+                changed = true;
+                return { ...item, stockBySize: latestStock };
+              }
+            }
+            return item;
+          });
+          return changed ? updated : prev;
+        });
+      } catch (err) {
+        console.error("Failed to sync bag items stock limits:", err);
+      }
+    }
+
+    updateStockLimits();
+    return () => {
+      active = false;
+    };
+  }, [isInitialized, bagItems.length]);
+
   const addToBag = (item: BagItem) => {
     setBagItems((prev) => {
       // If an item with the same id and size already exists, increment its quantity
@@ -120,9 +174,16 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
         (existing) => existing.id === item.id && existing.size === item.size
       );
       if (existingIndex > -1) {
+        const existing = prev[existingIndex];
+        const currentQty = Number(existing.quantity) || 1;
+        const stock = existing.stockBySize?.[existing.size] ?? item.stockBySize?.[item.size] ?? 100;
+        if (currentQty >= stock) {
+          toast.error(`Cannot add more. Only ${stock} units of ${existing.title} (${existing.size}) are in stock.`);
+          return prev;
+        }
         return prev.map((existing, index) =>
           index === existingIndex
-            ? { ...existing, quantity: (Number(existing.quantity) || 1) + 1 }
+            ? { ...existing, quantity: currentQty + 1 }
             : existing
         );
       }
@@ -143,6 +204,11 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
             const currentQty = Number(item.quantity) || 1;
             const change = Number(delta);
             const newQty = currentQty + change;
+            const stock = item.stockBySize?.[size] ?? 100;
+            if (change > 0 && newQty > stock) {
+              toast.error(`Cannot increase quantity. Only ${stock} units of ${item.title} (${size}) are in stock.`);
+              return item;
+            }
             return { ...item, quantity: newQty };
           }
           return item;

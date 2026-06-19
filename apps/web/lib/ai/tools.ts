@@ -1,41 +1,23 @@
 import { tool, stepCountIs } from 'ai'
 import { z } from 'zod'
-import { checkInventory, hybridSearch } from '@/lib/ai/search'
+import { hybridSearch } from '@/lib/ai/search'
 import { searchForOccasion } from '@/lib/ai/occasion-search'
 import type { OccasionKey } from '@/lib/ai/occasion-search'
-import { strictCatalogSearch } from '@/lib/ai/catalog-search'
 import { buildBudgetOutfit } from '@/lib/ai/outfit-search'
-import {
-  mergeSearchFilters,
-  parseQueryConstraints,
-  describeAppliedFilters,
-} from '@/lib/ai/search-constraints'
 import { createClient } from '@/lib/supabase/server'
-import { getImageForChat, clearImageForChat } from '@/lib/ai/image-store'
+
+import { searchSchema, searchProductsExecute } from './tool-handlers/search-products'
+import { inventorySchema, checkInventoryExecute } from './tool-handlers/check-inventory'
+import { visualSearchSchema, visualSearchExecute } from './tool-handlers/visual-search'
+import { catalogCountSchema, getCatalogCountExecute } from './tool-handlers/catalog-count'
 
 /**
  * Vestira Concierge Tool Registry — AI SDK v6 compatible
- * AI SDK v6 uses `inputSchema` instead of `parameters`
  */
 
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 1: searchProducts
 // ─────────────────────────────────────────────────────────────────────
-const searchSchema = z.object({
-  query: z.string().describe('The user\'s search query in natural language'),
-  category: z
-    .string()
-    .optional()
-    .describe('REQUIRED when user names a product type (e.g. dresses, tops). Results are limited to this category only.'),
-  gender: z.string().optional(),
-  priceMin: z.number().optional().describe('Minimum price in INR when user says "over ₹X" or "from ₹X".'),
-  priceMax: z
-    .number()
-    .optional()
-    .describe('Maximum price in INR when user says "under ₹X", "below ₹X", or "max ₹X". Results never exceed this.'),
-  count: z.number().optional().describe('Number of items to return (default 6)'),
-})
-
 export const searchProductsTool = tool<z.infer<typeof searchSchema>, Awaited<ReturnType<typeof searchProductsExecute>>>({
   description:
     'Search the fashion catalog with strict filters. ALWAYS set category and priceMax/priceMin when the user specifies them. Returns only DB rows matching ALL filters — empty list if none exist (never unrelated products).',
@@ -43,86 +25,14 @@ export const searchProductsTool = tool<z.infer<typeof searchSchema>, Awaited<Ret
   execute: searchProductsExecute,
 })
 
-async function searchProductsExecute(params: z.infer<typeof searchSchema>) {
-  const { query, category, gender, priceMin, priceMax, count = 6 } = params
-  const filters = mergeSearchFilters(
-    { query, category: category as any, gender: gender as any, priceMin, priceMax },
-    parseQueryConstraints(query)
-  )
-
-  const { products, totalFound, empty, emptyMessage, appliedFilters } = await strictCatalogSearch(
-    filters,
-    count
-  )
-
-  return {
-    type: 'product_carousel' as const,
-    products: products.map((p) => ({
-      id: p.product_id,
-      title: p.title,
-      sku: p.sku,
-      price: p.price,
-      category: p.category,
-      tags: p.tags,
-      imageUrl: p.image_urls?.[0] ?? '',
-      imageUrls: p.image_urls ?? [],
-      colors: p.colors,
-      sizes: p.sizes,
-      stockBySize: p.stock_by_size as Record<string, number>,
-      brand: p.brand,
-      description: p.description,
-      rrfScore: p.rrf_score,
-    })),
-    query,
-    totalFound,
-    empty,
-    emptyMessage,
-    appliedFilters: {
-      category: appliedFilters.category,
-      priceMin: appliedFilters.priceMin,
-      priceMax: appliedFilters.priceMax,
-      gender: appliedFilters.gender,
-      label: describeAppliedFilters(appliedFilters),
-    },
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 2: checkInventory
 // ─────────────────────────────────────────────────────────────────────
-const inventorySchema = z.object({
-  sku: z.string().describe('The product SKU to check inventory for'),
-})
-
 export const checkInventoryTool = tool<z.infer<typeof inventorySchema>, Awaited<ReturnType<typeof checkInventoryExecute>>>({
   description: 'Check real-time stock availability for a specific product SKU.',
   inputSchema: inventorySchema,
   execute: checkInventoryExecute,
 })
-
-async function checkInventoryExecute(params: z.infer<typeof inventorySchema>) {
-  const { sku } = params
-  const result = await checkInventory(sku)
-  if (!result) return { type: 'inventory_not_found' as const, sku }
-
-  const stockMap = (result.stock_by_size ?? {}) as Record<string, number>
-  const availableSizes = Object.entries(stockMap)
-    .filter(([, qty]) => qty > 0)
-    .map(([size, qty]) => ({ size, qty }))
-  const totalStock = Object.values(stockMap).reduce((sum: number, q: unknown) => sum + (q as number), 0)
-
-  return {
-    type: 'size_picker' as const,
-    productId: (result.product_id as string) ?? '',
-    title: (result.title as string) ?? '',
-    sku: (result.sku as string) ?? sku,
-    stockBySize: stockMap,
-    availableSizes,
-    totalStock,
-    isLowStock: totalStock < 5,
-    isActive: (result.is_active as boolean) ?? true,
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 3: getUserStyleProfile
@@ -227,18 +137,11 @@ export const generateOutfitLookTool = tool({
     occasion: z.string().describe('Occasion: "gala", "office", "casual", "weekend"'),
     colorPalette: z.string().optional().describe('Color palette: "monochrome", "earth tones", "all ivory"'),
     baseItem: z.string().optional().describe('Anchor item to build look around'),
-    totalBudgetMax: z
-      .number()
-      .optional()
-      .describe('Total outfit budget in INR (e.g. 200 for "outfit under ₹200"). Sum of all pieces must stay at or below this.'),
-    queryText: z
-      .string()
-      .optional()
-      .describe('Original user message — used to parse budget if totalBudgetMax omitted'),
+    totalBudgetMax: z.number().optional().describe('Total outfit budget in INR. Sum of all pieces must stay at or below this.'),
+    queryText: z.string().optional().describe('Original user message — used to parse budget if totalBudgetMax omitted'),
   }),
   execute: async (params) => {
     const { occasion, colorPalette, baseItem, totalBudgetMax, queryText } = params
-
     const { look, totalPrice, totalBudgetMax: budget, empty, emptyMessage } =
       await buildBudgetOutfit({
         occasion,
@@ -323,14 +226,12 @@ export const addToBagTool = tool({
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 8: compareProducts
 // ─────────────────────────────────────────────────────────────────────
-const comparisonSchema = z.object({
-  skuA: z.string().describe('SKU of first product to compare'),
-  skuB: z.string().describe('SKU of second product to compare'),
-})
-
 export const compareProductsTool = tool({
   description: 'Compare two products side-by-side. Use when the user asks to compare two products or is deciding between two items.',
-  inputSchema: comparisonSchema,
+  inputSchema: z.object({
+    skuA: z.string().describe('SKU of first product to compare'),
+    skuB: z.string().describe('SKU of second product to compare'),
+  }),
   execute: async (params) => {
     const { skuA, skuB } = params
     const supabase = await createClient()
@@ -367,15 +268,6 @@ export const compareProductsTool = tool({
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 9: recommendByOccasion
 // ─────────────────────────────────────────────────────────────────────
-const occasionRecSchema = z.object({
-  occasion: z
-    .string()
-    .describe(
-      'The occasion to recommend items for. Must be one of: wedding, office, vacation, date night, party, casual. Use the closest match for synonyms (e.g. "gala" → "wedding", "evening" → "date night", "weekend" → "casual", "travel" → "vacation").'
-    ),
-  count: z.coerce.number().optional().describe('Number of items (default 6)'),
-})
-
 /** Normalize free-text occasion synonyms to a valid OccasionKey. */
 function normalizeOccasion(raw: string): OccasionKey {
   const val = raw.toLowerCase().trim()
@@ -384,14 +276,16 @@ function normalizeOccasion(raw: string): OccasionKey {
   if (val === 'vacation' || val === 'travel' || val === 'beach' || val === 'resort' || val === 'holiday') return 'vacation'
   if (val === 'date night' || val === 'date' || val === 'evening' || val === 'dinner' || val === 'romantic') return 'date night'
   if (val === 'party' || val === 'celebration' || val === 'cocktail' || val === 'festive' || val === 'night out') return 'party'
-  // Default: casual covers weekend, brunch, everyday, etc.
   return 'casual'
 }
 
 export const recommendByOccasionTool = tool({
   description:
     'Recommend products for a named occasion (wedding, office, vacation, date night, party, casual). Use when the user frames an event/occasion — NOT for generic catalog browse (use searchProducts). Same product grid UI with occasion header.',
-  inputSchema: occasionRecSchema,
+  inputSchema: z.object({
+    occasion: z.string().describe('The occasion to recommend items for. Must be one of: wedding, office, vacation, date night, party, casual.'),
+    count: z.coerce.number().optional().describe('Number of items (default 6)'),
+  }),
   execute: async (params) => {
     const { occasion: rawOccasion, count = 6 } = params
     const occasion = normalizeOccasion(rawOccasion)
@@ -422,311 +316,20 @@ export const recommendByOccasionTool = tool({
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 10: findSimilarProducts (Visual Search)
 // ─────────────────────────────────────────────────────────────────────
-const visualSearchSchema = z.object({
-  imageDescription: z.string().describe('Rich visual description of the uploaded image: garment type, color, fabric, graphic/print details, brand name visible, aesthetic, style.'),
-  chatId: z.string().optional().describe('Chat session ID used to retrieve the uploaded image for pixel-level fingerprint matching.'),
-  exactSku: z.string().optional().describe('The SKU of the exact product in our catalog if it matches the uploaded image. Check the product list in your system instructions.'),
-  gender: z.enum(['women', 'men', 'unisex']).optional(),
-  count: z.number().optional().describe('Number of items (default 6)'),
-})
-
-/**
- * Computes a byte-level fingerprint from raw image bytes for fast similarity comparison.
- */
-function extractByteFingerprint(bytes: Uint8Array): number[] {
-  const SAMPLES = 256
-  const step = Math.max(1, Math.floor(bytes.length / SAMPLES))
-  const fingerprint: number[] = []
-  for (let i = 0; i < SAMPLES; i++) {
-    const pos = i * step
-    fingerprint.push(pos < bytes.length ? bytes[pos] / 255 : 0)
-  }
-  return fingerprint
-}
-
-function cosineSim(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0
-  let dot = 0, normA = 0, normB = 0
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]
-    normA += a[i] * a[i]
-    normB += b[i] * b[i]
-  }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB)
-  return denom === 0 ? 0 : dot / denom
-}
-
-/** Parse category from an image description string */
-function extractCategoryFromDescription(desc: string): string | null {
-  const lower = desc.toLowerCase()
-  if (/\bt[-\s]?shirt|tee|graphic tee|tshirt\b/.test(lower)) return 'tops'
-  if (/\bshirt|blouse|top|cami|tank\b/.test(lower)) return 'tops'
-  if (/\bdress|gown|midi|maxi|mini dress\b/.test(lower)) return 'dresses'
-  if (/\bpant|trouser|jean|chino|bottom\b/.test(lower)) return 'trousers'
-  if (/\bcoat|jacket|blazer|outerwear|cardigan\b/.test(lower)) return 'outerwear'
-  if (/\bbag|scarf|belt|accessory\b/.test(lower)) return 'accessories'
-  return null
-}
-
-function formatProductRow(p: Record<string, unknown>, score?: number) {
-  return {
-    id: p.id as string,
-    title: p.title as string,
-    sku: p.sku as string,
-    price: p.price as number,
-    category: p.category as string,
-    tags: (p.tags as string[]) ?? [],
-    imageUrl: ((p.image_urls as string[])?.[0]) ?? '',
-    imageUrls: (p.image_urls as string[]) ?? [],
-    colors: (p.colors as string[]) ?? [],
-    sizes: (p.sizes as string[]) ?? [],
-    stockBySize: (p.stock_by_size ?? {}) as Record<string, number>,
-    brand: p.brand as string,
-    description: p.description as string,
-    similarityScore: score !== undefined ? Math.round(score * 100) : undefined,
-  }
-}
-
 export const visualSearchTool = tool({
   description: 'Find products matching a visual/image description. ALWAYS pass chatId from the current session. If you identified the exact product SKU from the catalog, pass it as exactSku so the search results show the exact product first.',
   inputSchema: visualSearchSchema,
-  execute: async (params) => {
-    const { imageDescription, chatId, exactSku, gender, count = 6 } = params
-    const supabase = await createClient()
-
-    // ── Stage 0: Exact SKU matching ──
-    if (exactSku) {
-      console.log(`[visualSearch] exactSku provided: ${exactSku}`)
-      const { data: p } = await supabase
-        .from('products')
-        .select('id, title, sku, price, category, brand, image_urls, colors, sizes, tags, description, stock_by_size')
-        .eq('sku', exactSku)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (p) {
-        console.log(`[visualSearch] Found exact product by SKU: ${p.title}`)
-        let similarProducts: Record<string, unknown>[] = []
-        try {
-          const results = await hybridSearch({
-            query: imageDescription,
-            matchCount: count + 4,
-            filterGender: gender ?? null,
-            semanticWeight: 0.85,
-            keywordWeight: 0.15,
-          })
-          similarProducts = results
-            .filter((item) => item.sku !== exactSku)
-            .slice(0, count - 1)
-            .map((item) => ({
-              id: item.product_id,
-              title: item.title,
-              sku: item.sku,
-              price: item.price,
-              category: item.category,
-              tags: item.tags,
-              image_urls: item.image_urls,
-              colors: item.colors,
-              sizes: item.sizes,
-              stock_by_size: item.stock_by_size,
-              brand: item.brand,
-              description: item.description,
-            })) as any[]
-        } catch (err) {
-          console.warn('[visualSearch] Hybrid search failed for similar items, querying by category:', err)
-          const detectedCategory = extractCategoryFromDescription(imageDescription)
-          let q = supabase
-            .from('products')
-            .select('id, title, sku, price, category, brand, image_urls, colors, sizes, tags, description, stock_by_size')
-            .eq('is_active', true)
-            .neq('sku', exactSku)
-          if (detectedCategory) {
-            q = q.eq('category', detectedCategory)
-          }
-          const { data: fallbackProducts } = await q.limit(count - 1)
-          similarProducts = (fallbackProducts ?? []) as Record<string, unknown>[]
-        }
-
-        if (chatId) {
-          clearImageForChat(chatId)
-        }
-
-        const formattedExact = formatProductRow(p as Record<string, unknown>, 1.0)
-        const formattedSimilar = similarProducts.map((item) => formatProductRow(item))
-
-        return {
-          type: 'image_search_result' as const,
-          imageDescription,
-          exactMatch: true,
-          topScore: 100,
-          products: [formattedExact, ...formattedSimilar],
-        }
-      }
-    }
-
-    // ── Stage 1: Pixel fingerprint matching (exact/near-exact match) ──
-    if (chatId) {
-      const imageBase64 = getImageForChat(chatId)
-      if (imageBase64) {
-        try {
-          console.log('[visualSearch] Attempting pixel fingerprint match...')
-          const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '')
-          const uploadedBytes = Uint8Array.from(Buffer.from(base64Data, 'base64'))
-          const uploadedFingerprint = extractByteFingerprint(uploadedBytes)
-
-          const { data: allProducts } = await supabase
-            .from('products')
-            .select('id, title, sku, price, category, brand, image_urls, colors, sizes, tags, description, stock_by_size')
-            .eq('is_active', true)
-            .not('image_urls', 'is', null)
-
-          if (allProducts && allProducts.length > 0) {
-            const BATCH = 6
-            const scored: Array<{ product: typeof allProducts[0]; score: number }> = []
-
-            for (let i = 0; i < allProducts.length; i += BATCH) {
-              const batch = allProducts.slice(i, i + BATCH)
-              const results = await Promise.allSettled(
-                batch.map(async (p) => {
-                  const url = (p.image_urls as string[])?.[0]
-                  if (!url) return null
-
-                  const ctrl = new AbortController()
-                  const timer = setTimeout(() => ctrl.abort(), 5000)
-                  try {
-                    const res = await fetch(url, {
-                      signal: ctrl.signal,
-                      headers: { 'User-Agent': 'VestiraConcierge/1.0' }
-                    })
-                    clearTimeout(timer)
-                    if (!res.ok) return null
-                    const buf = await res.arrayBuffer()
-                    const bytes = new Uint8Array(buf)
-                    const fp = extractByteFingerprint(bytes)
-                    const score = cosineSim(uploadedFingerprint, fp)
-                    return { product: p, score }
-                  } catch {
-                    clearTimeout(timer)
-                    return null
-                  }
-                })
-              )
-
-              for (const r of results) {
-                if (r.status === 'fulfilled' && r.value !== null) {
-                  scored.push(r.value)
-                }
-              }
-            }
-
-            clearImageForChat(chatId)
-
-            if (scored.length > 0) {
-              scored.sort((a, b) => b.score - a.score)
-              const EXACT_THRESHOLD = 0.97
-              const topMatches = scored.slice(0, count)
-
-              console.log(`[visualSearch] Fingerprint top score: ${topMatches[0].score.toFixed(3)}, product: ${topMatches[0].product.title}`)
-
-              return {
-                type: 'image_search_result' as const,
-                imageDescription,
-                exactMatch: topMatches[0].score >= EXACT_THRESHOLD,
-                topScore: Math.round(topMatches[0].score * 100),
-                products: topMatches.map(({ product: p, score }: { product: typeof scored[0]['product']; score: number }) =>
-                  formatProductRow(p as Record<string, unknown>, score)
-                ),
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('[visualSearch] Fingerprint matching failed, falling back to text search:', err)
-        }
-      }
-    }
-
-    // ── Stage 2: Text-based hybrid search fallback ──
-    console.log('[visualSearch] Using text-based hybrid search for:', imageDescription)
-    try {
-      const results = await hybridSearch({
-        query: imageDescription,
-        matchCount: count + 4,
-        filterGender: gender ?? null,
-        semanticWeight: 0.85,
-        keywordWeight: 0.15,
-      })
-
-      if (results.length > 0) {
-        return {
-          type: 'image_search_result' as const,
-          imageDescription,
-          exactMatch: false,
-          products: results.slice(0, count).map((p) => ({
-            id: p.product_id,
-            title: p.title,
-            sku: p.sku,
-            price: p.price,
-            category: p.category,
-            tags: p.tags,
-            imageUrl: p.image_urls?.[0] ?? '',
-            imageUrls: p.image_urls ?? [],
-            colors: p.colors,
-            sizes: p.sizes,
-            stockBySize: p.stock_by_size as Record<string, number>,
-            brand: p.brand,
-            description: p.description,
-          })),
-        }
-      }
-    } catch (err) {
-      console.warn('[visualSearch] Hybrid search failed, using DB fallback:', err)
-    }
-
-    // ── Stage 3: Guaranteed DB fallback — always return something ──
-    console.log('[visualSearch] Using guaranteed DB fallback')
-    const detectedCategory = extractCategoryFromDescription(imageDescription)
-
-    let fallbackQuery = supabase
-      .from('products')
-      .select('id, title, sku, price, category, brand, image_urls, colors, sizes, tags, description, stock_by_size')
-      .eq('is_active', true)
-
-    if (detectedCategory) {
-      fallbackQuery = (fallbackQuery as any).eq('category', detectedCategory)
-    }
-
-    const { data: fallbackProducts } = await (fallbackQuery as any).limit(count)
-    let finalProducts = (fallbackProducts ?? []) as Record<string, unknown>[]
-
-    // If category-filtered returned nothing, fetch any active products
-    if (finalProducts.length === 0) {
-      const { data: anyProducts } = await supabase
-        .from('products')
-        .select('id, title, sku, price, category, brand, image_urls, colors, sizes, tags, description, stock_by_size')
-        .eq('is_active', true)
-        .limit(count)
-      finalProducts = (anyProducts ?? []) as Record<string, unknown>[]
-    }
-
-    return {
-      type: 'image_search_result' as const,
-      imageDescription,
-      exactMatch: false,
-      products: finalProducts.map((p) => formatProductRow(p)),
-    }
-  }
+  execute: visualSearchExecute,
 })
 
 // ─────────────────────────────────────────────────────────────────────
 // TOOL 11: getProductDetails
 // ─────────────────────────────────────────────────────────────────────
-const productDetailsSchema = z.object({
-  sku: z.string().describe('The product SKU to get details for'),
-})
-
 export const getProductDetailsTool = tool({
   description: 'Retrieve detailed information for a specific product by SKU.',
-  inputSchema: productDetailsSchema,
+  inputSchema: z.object({
+    sku: z.string().describe('The product SKU to get details for'),
+  }),
   execute: async (params) => {
     const { sku } = params
     const supabase = await createClient()
@@ -756,81 +359,20 @@ export const getProductDetailsTool = tool({
 })
 
 // ─────────────────────────────────────────────────────────────────────
-// TOOL 12: getCatalogCount  (intent-classified inventory counts)
+// TOOL 12: getCatalogCount
 // ─────────────────────────────────────────────────────────────────────
-const catalogCountSchema = z.object({
-  query: z.string().optional().describe('Natural-language keyword filter (e.g. "silk", "blue saree", "sale")'),
-  category: z.string().optional().describe('Category filter: tops, dresses, trousers, outerwear, accessories, etc.'),
-  gender: z.string().optional().describe('Gender filter: women, men, unisex'),
-  priceMin: z.number().optional().describe('Minimum price in INR'),
-  priceMax: z.number().optional().describe('Maximum price in INR'),
-})
-
 export const getCatalogCountTool = tool({
   description:
     'Count how many products match specific discovery filters (category, price range, keyword). ' +
-    'Use ONLY for discovery-intent count queries like "how many blue dresses do you have?", ' +
-    '"how many items under ₹2,000?", or "how many sarees are on sale?". ' +
-    'NEVER use for abstract totals like "how many pieces in your store?" or "what is your SKU count?" — those must be deflected. ' +
+    'Use ONLY for discovery-intent count queries like "how many blue dresses do you have?". ' +
+    'NEVER use for abstract totals like "how many pieces in your store?". ' +
     'After returning the count, immediately call searchProducts to show the matching products.',
   inputSchema: catalogCountSchema,
-  execute: async (params) => {
-    const { query, category, gender, priceMin, priceMax } = params
-    const supabase = await createClient()
-
-    // Build count query with all applicable filters
-    let q = supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-
-    if (category) {
-      q = (q as any).ilike('category', `%${category}%`)
-    }
-    if (gender) {
-      q = (q as any).ilike('gender', `%${gender}%`)
-    }
-    if (priceMin !== undefined) {
-      q = (q as any).gte('price', priceMin)
-    }
-    if (priceMax !== undefined) {
-      q = (q as any).lte('price', priceMax)
-    }
-    if (query) {
-      q = (q as any).textSearch('fts_document', query, { config: 'english', type: 'websearch' })
-    }
-
-    const { count, error } = await q
-
-    // Build a human-readable label from the applied filters
-    const labelParts: string[] = []
-    if (query) labelParts.push(query)
-    if (category) labelParts.push(category)
-    if (gender) labelParts.push(`(${gender})`)
-    if (priceMin !== undefined && priceMax !== undefined) {
-      labelParts.push(`₹${priceMin}–₹${priceMax}`)
-    } else if (priceMax !== undefined) {
-      labelParts.push(`under ₹${priceMax}`)
-    } else if (priceMin !== undefined) {
-      labelParts.push(`over ₹${priceMin}`)
-    }
-    const label = labelParts.join(' ') || 'products'
-
-    if (error) {
-      console.error('[getCatalogCount] Supabase error:', error)
-      return { type: 'catalog_count' as const, count: 0, label, error: error.message }
-    }
-
-    return {
-      type: 'catalog_count' as const,
-      count: count ?? 0,
-      label,
-    }
-  },
+  execute: getCatalogCountExecute,
 })
 
 // ─────────────────────────────────────────────────────────────────────
-// Export stopWhen helper for chat route (replaces maxSteps)
+// Export stopWhen helper for chat route
 // ─────────────────────────────────────────────────────────────────────
 export { stepCountIs }
 

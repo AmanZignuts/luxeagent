@@ -4,6 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBag } from "../../(customer)/BagContext";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 
 function formatPrice(price: number) {
   return `₹${price.toLocaleString("en-IN")}`;
@@ -109,6 +111,8 @@ export function ConciergeBagDrawer() {
                               disabled={(item.quantity || 1) <= 1}
                               onClick={() => updateQuantity(item.id, item.size, -1)}
                               className="px-2 py-0.5 text-[10px] font-bold text-obsidian-velvet/80 hover:bg-warm-linen disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer border-none bg-transparent"
+                              data-tooltip-id="concierge-bag-tooltip"
+                              data-tooltip-content="Decrease quantity"
                             >
                               −
                             </button>
@@ -117,8 +121,11 @@ export function ConciergeBagDrawer() {
                             </span>
                             <button
                               type="button"
+                              disabled={(item.quantity || 1) >= (item.stockBySize?.[item.size] ?? 100)}
                               onClick={() => updateQuantity(item.id, item.size, 1)}
-                              className="px-2 py-0.5 text-[10px] font-bold text-obsidian-velvet/80 hover:bg-warm-linen cursor-pointer border-none bg-transparent"
+                              className="px-2 py-0.5 text-[10px] font-bold text-obsidian-velvet/80 hover:bg-warm-linen disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer border-none bg-transparent"
+                              data-tooltip-id="concierge-bag-tooltip"
+                              data-tooltip-content={(item.quantity || 1) >= (item.stockBySize?.[item.size] ?? 100) ? `Only ${item.stockBySize?.[item.size] ?? 100} units available in stock` : "Increase quantity"}
                             >
                               +
                             </button>
@@ -162,6 +169,7 @@ export function ConciergeBagDrawer() {
               </button>
               <Link
                 href="/checkout"
+                onClick={() => setIsBagDrawerOpen(false)}
                 className="block w-full text-center bg-obsidian-velvet text-surface-white font-sans font-bold text-[9px] uppercase tracking-wider rounded-xl py-3 hover:bg-obsidian-velvet/90 transition-all"
               >
                 Proceed to checkout →
@@ -169,6 +177,7 @@ export function ConciergeBagDrawer() {
               <p className="font-sans text-[8px] text-obsidian-velvet/35 text-center leading-relaxed">
                 Checkout opens in the shop flow. Your concierge chat stays here when you return.
               </p>
+              <Tooltip id="concierge-bag-tooltip" className="z-50" style={{ borderRadius: '6px', fontSize: '10px', padding: '6px 10px' }} />
             </div>
           </motion.aside>
         </>

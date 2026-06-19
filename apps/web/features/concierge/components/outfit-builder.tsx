@@ -16,6 +16,7 @@ export function OutfitBuilder({
   emptyMessage,
   onSwapItem,
   swappingSku,
+  append,
 }: {
   occasion: string;
   colorPalette?: string;
@@ -26,6 +27,7 @@ export function OutfitBuilder({
   onOpenSizes?: (item: StagedLookItem) => void;
   onSwapItem?: (item: StagedLookItem) => void;
   swappingSku?: string | null;
+  append?: (msg: { role: "user"; content: string }) => void;
 }) {
   const { addToBag } = useBag();
   const [addedItems, setAddedItems] = useState<Record<string, boolean>>({});
@@ -290,31 +292,34 @@ export function OutfitBuilder({
                 </span>
 
                 {/* Inline size selector buttons */}
-                <div className="h-[18px] mt-1.5 flex items-center">
+                <div className="mt-1.5 flex flex-col gap-1">
                   {isSizeLoading ? null : sizesToRender.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {sizesToRender.map((sz) => {
-                        const currentSelected = selectedSizes[item.id] !== undefined
-                          ? selectedSizes[item.id]
-                          : (sizesToRender && sizesToRender.length > 0 ? sizesToRender[0] : undefined);
-                        const isSelected = currentSelected === sz;
-                        return (
-                          <button
-                            key={sz}
-                            type="button"
-                            disabled={swappingSku === item.sku}
-                            onClick={() => setSelectedSizes((prev) => ({ ...prev, [item.id]: sz }))}
-                            className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border transition-all cursor-pointer h-[18px] flex items-center justify-center min-w-[24px] ${
-                              isSelected
-                                ? "bg-obsidian-velvet text-surface-white border-obsidian-velvet shadow-sm"
-                                : "bg-surface-white text-obsidian-velvet/60 border-muted-zinc/60 hover:border-obsidian-velvet/40"
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          >
-                            {sz}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sizesToRender.map((sz) => {
+                          const currentSelected = selectedSizes[item.id] !== undefined
+                            ? selectedSizes[item.id]
+                            : (sizesToRender && sizesToRender.length > 0 ? sizesToRender[0] : undefined);
+                          const isSelected = currentSelected === sz;
+                          return (
+                            <button
+                              key={sz}
+                              type="button"
+                              disabled={swappingSku === item.sku}
+                              onClick={() => setSelectedSizes((prev) => ({ ...prev, [item.id]: sz }))}
+                              className={`px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border transition-all cursor-pointer h-[18px] flex items-center justify-center min-w-[24px] ${
+                                isSelected
+                                  ? "bg-obsidian-velvet text-surface-white border-obsidian-velvet shadow-sm"
+                                  : "bg-surface-white text-obsidian-velvet/60 border-muted-zinc/60 hover:border-obsidian-velvet/40"
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {sz}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                    </>
                   ) : (
                     <span className="text-[8px] text-red-500 uppercase tracking-widest font-semibold block">Out of stock</span>
                   )}

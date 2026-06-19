@@ -6,6 +6,7 @@ import { Agentation } from "agentation";
 import GlobalLoader from "@/components/GlobalLoader";
 import { cn } from "@/lib/utils";
 import { Suspense } from "react";
+import { BagProvider } from "@/app/(customer)/BagContext";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -32,7 +33,9 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <GlobalLoader />
         </Suspense>
-        {children}
+        <BagProvider>
+          {children}
+        </BagProvider>
         <Toaster richColors position="top-right" closeButton />
         {process.env.NODE_ENV === "development" && <Agentation />}
       </body>

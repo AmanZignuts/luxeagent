@@ -50,58 +50,130 @@ export async function POST(request: Request) {
     const sku     = formData.get('sku') as string
     const files   = formData.getAll('images') as File[]
 
-    if (!title || !price || !sku || files.length === 0) {
+    const category = formData.get('category') as string
+    const subCategory = formData.get('sub_category') as string
+    const description = formData.get('description') as string
+    const gender = formData.get('gender') as string
+    const material = formData.get('material') as string
+    const tagsRaw = formData.get('tags') as string
+    const colorsRaw = formData.get('colors') as string
+    const imageCaption = formData.get('image_caption') as string
+    const brand = formData.get('brand') as string || 'LuxeLabel'
+    const stock = parseInt(formData.get('stock') as string, 10)
+    const imageUrlsRaw = formData.get('image_urls') as string
+
+    if (!title || isNaN(price) || !sku) {
       return NextResponse.json(
-        { error: 'Missing required fields: title, price, sku, images' },
+        { error: 'Missing required fields: title, price, sku' },
         { status: 400 }
       )
     }
 
-    // ── Step 1: Ensure storage bucket exists & upload images ──────────
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets()
-      const hasBucket = buckets?.some(b => b.id === 'product-images')
-      if (!hasBucket) {
-        await supabase.storage.createBucket('product-images', {
-          public: true,
-        })
+    // ── Parse tags, colors, and image_urls if provided ───────────────
+    let tags: string[] = []
+    if (tagsRaw) {
+      try {
+        tags = JSON.parse(tagsRaw)
+      } catch {
+        tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
       }
-    } catch (e) {
-      console.warn('[ingest] Could not ensure storage bucket exists:', e)
     }
 
-    const imageUrls: string[] = []
-    for (const file of files.slice(0, 4)) {  // max 4 images per product
-      const fileBuffer = Buffer.from(await file.arrayBuffer())
-      const fileName = `products/${sku}/${Date.now()}_${file.name.replace(/\s/g, '_')}`
+    let colors: string[] = []
+    if (colorsRaw) {
+      try {
+        colors = JSON.parse(colorsRaw)
+      } catch {
+        colors = colorsRaw.split(',').map(c => c.trim()).filter(Boolean)
+      }
+    }
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, fileBuffer, {
-          contentType: file.type,
-          upsert: true,
-        })
+    let imageUrls: string[] = []
+    if (imageUrlsRaw) {
+      try {
+        imageUrls = JSON.parse(imageUrlsRaw)
+      } catch {
+        imageUrls = imageUrlsRaw.split(',').map(u => u.trim()).filter(Boolean)
+      }
+    }
 
-      if (uploadError) {
-        console.error('[ingest] Storage upload error:', uploadError)
-        continue
+    // ── Step 1: Ensure storage bucket exists & upload new images if any ──
+    const hasFiles = files && files.length > 0 && files[0] instanceof File && files[0].size > 0
+    if (hasFiles) {
+      try {
+        const { data: buckets } = await supabase.storage.listBuckets()
+        const hasBucket = buckets?.some(b => b.id === 'product-images')
+        if (!hasBucket) {
+          await supabase.storage.createBucket('product-images', {
+            public: true,
+          })
+        }
+      } catch (e) {
+        console.warn('[ingest] Could not ensure storage bucket exists:', e)
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(uploadData.path)
+      const uploadedUrls: string[] = []
+      for (const file of files.slice(0, 4)) {  // max 4 images per product
+        const fileBuffer = Buffer.from(await file.arrayBuffer())
+        const fileName = `products/${sku}/${Date.now()}_${file.name.replace(/\s/g, '_')}`
 
-      imageUrls.push(publicUrl)
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, fileBuffer, {
+            contentType: file.type,
+            upsert: true,
+          })
+
+        if (uploadError) {
+          console.error('[ingest] Storage upload error:', uploadError)
+          continue
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(uploadData.path)
+
+        uploadedUrls.push(publicUrl)
+      }
+
+      // If we uploaded new images, prioritize them
+      if (uploadedUrls.length > 0) {
+        imageUrls = [...uploadedUrls, ...imageUrls]
+      }
     }
 
     if (imageUrls.length === 0) {
-      return NextResponse.json({ error: 'All image uploads failed' }, { status: 500 })
+      return NextResponse.json({ error: 'No product images provided or upload failed' }, { status: 400 })
     }
 
-    // ── Step 2: Gemini Vision — extract structured metadata ──────────
+    // ── Step 2: Gemini Vision or Use Pre-Analyzed Metadata ───────────
+    let aiMetadata: {
+      description?: string
+      category?: string
+      sub_category?: string
+      gender?: string
+      colors?: string[]
+      tags?: string[]
+      material_composition?: string
+      image_caption?: string
+    } = {}
+
+    const hasPreAnalyzedMetadata = !!category && !!description
     const primaryImageUrl = imageUrls[0]
 
-    const visionPrompt = `You are analyzing a luxury fashion product image for a high-end e-commerce platform.
+    if (hasPreAnalyzedMetadata) {
+      aiMetadata = {
+        description,
+        category,
+        sub_category: subCategory || '',
+        gender: gender || 'women',
+        colors,
+        tags,
+        material_composition: material || '',
+        image_caption: imageCaption || title,
+      }
+    } else {
+      const visionPrompt = `You are analyzing a luxury fashion product image for a high-end e-commerce platform.
 
 Analyze this product image and return a JSON object with ONLY these exact fields:
 {
@@ -117,43 +189,33 @@ Analyze this product image and return a JSON object with ONLY these exact fields
 
 Return ONLY valid JSON. No markdown, no explanation.`
 
-    let aiMetadata: {
-      description?: string
-      category?: string
-      sub_category?: string
-      gender?: string
-      colors?: string[]
-      tags?: string[]
-      material_composition?: string
-      image_caption?: string
-    } = {}
-
-    try {
-      const { text: visionResponse } = await generateText({
-        model: getModel('vision'),
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'image', image: primaryImageUrl },
-              { type: 'text', text: visionPrompt },
-            ],
-          },
-        ],
-      })
-      const cleaned = visionResponse.replace(/```json\n?|\n?```/g, '').trim()
-      aiMetadata = JSON.parse(cleaned)
-    } catch (e) {
-      console.warn('[ingest] Gemini Vision model call failed (likely quota limit). Using defaults.', e)
-      aiMetadata = {
-        description: title,
-        category: 'tops',
-        sub_category: 'apparel',
-        gender: 'unisex',
-        tags: [],
-        colors: [],
-        material_composition: '',
-        image_caption: title,
+      try {
+        const { text: visionResponse } = await generateText({
+          model: getModel('vision'),
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'image', image: primaryImageUrl },
+                { type: 'text', text: visionPrompt },
+              ],
+            },
+          ],
+        })
+        const cleaned = visionResponse.replace(/```json\n?|\n?```/g, '').trim()
+        aiMetadata = JSON.parse(cleaned)
+      } catch (e) {
+        console.warn('[ingest] Gemini Vision model call failed (likely quota limit). Using defaults.', e)
+        aiMetadata = {
+          description: title,
+          category: 'tops',
+          sub_category: 'apparel',
+          gender: 'unisex',
+          tags: [],
+          colors: [],
+          material_composition: '',
+          image_caption: title,
+        }
       }
     }
 
@@ -167,6 +229,7 @@ Return ONLY valid JSON. No markdown, no explanation.`
       colors: aiMetadata.colors,
       material_composition: aiMetadata.material_composition,
       gender: aiMetadata.gender,
+      brand,
     })
 
     const contentHash = hashContent(textDocument)
@@ -199,6 +262,38 @@ Return ONLY valid JSON. No markdown, no explanation.`
       )
     }
 
+    const sizesRaw = formData.get('sizes') as string
+    const stockBySizeRaw = formData.get('stock_by_size') as string
+
+    let sizes: string[] = ['XS', 'S', 'M', 'L', 'XL']
+    if (sizesRaw) {
+      try {
+        sizes = JSON.parse(sizesRaw)
+      } catch {
+        sizes = sizesRaw.split(',').map(s => s.trim()).filter(Boolean)
+      }
+    }
+
+    let stockBySize: Record<string, number> = {}
+    if (stockBySizeRaw) {
+      try {
+        stockBySize = JSON.parse(stockBySizeRaw)
+      } catch {
+        console.error('Failed to parse stock_by_size JSON:', stockBySizeRaw)
+      }
+    }
+
+    // Fallback: If stock_by_size is empty but stock is provided, distribute stock
+    if (Object.keys(stockBySize).length === 0) {
+      const stockVal = isNaN(stock) ? 70 : stock
+      const stockXS = Math.floor(stockVal * 0.15)
+      const stockS = Math.floor(stockVal * 0.2)
+      const stockM = Math.floor(stockVal * 0.3)
+      const stockL = Math.floor(stockVal * 0.2)
+      const stockXL = stockVal - (stockXS + stockS + stockM + stockL)
+      stockBySize = { XS: stockXS, S: stockS, M: stockM, L: stockL, XL: stockXL }
+    }
+
     // ── Step 6: INSERT product into database ─────────────────────────
     const { data: product, error: productError } = await supabase
       .from('products')
@@ -206,15 +301,16 @@ Return ONLY valid JSON. No markdown, no explanation.`
         sku,
         title,
         price,
+        brand,
         description: aiMetadata.description ?? null,
         category: aiMetadata.category ?? null,
         sub_category: aiMetadata.sub_category ?? null,
         gender: aiMetadata.gender ?? 'women',
         tags: aiMetadata.tags ?? [],
         colors: aiMetadata.colors ?? [],
-        sizes: ['XS', 'S', 'M', 'L', 'XL'],
+        sizes: sizes,
         image_urls: imageUrls,
-        stock_by_size: { XS: 10, S: 15, M: 20, L: 15, XL: 10 },
+        stock_by_size: stockBySize,
         material_composition: aiMetadata.material_composition ?? null,
         ai_metadata: aiMetadata as unknown as import('@/lib/supabase/types').Json,
         vector_status: textEmbedding ? 'PENDING' : 'FAILED',
@@ -266,7 +362,6 @@ Return ONLY valid JSON. No markdown, no explanation.`
       aiMetadata,
       vectorStatus: textEmbedding ? 'ACTIVE' : 'FAILED',
     })
-
 
   } catch (error) {
     console.error('[ingest] Unexpected error:', error)

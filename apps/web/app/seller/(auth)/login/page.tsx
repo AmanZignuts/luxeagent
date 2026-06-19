@@ -19,7 +19,7 @@ const loginSchema = yup.object().shape({
 
 type LoginFormValues = yup.InferType<typeof loginSchema>;
 
-export default function MerchantLoginPage() {
+export default function SellerLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -41,13 +41,13 @@ export default function MerchantLoginPage() {
     try {
       const res = await loginAction(formData);
       if (res && res.error) {
-        handleApiError(res.error, "Merchant Login Action");
+        handleApiError(res.error, "Seller Login Action");
         setIsSubmitting(false);
       } else {
-        toast.success("Welcome back. Merchant console is ready.");
+        toast.success("Welcome back. Seller console is ready.");
       }
     } catch (err: any) {
-      handleApiError(err, "Merchant Login");
+      handleApiError(err, "Seller Login");
       setIsSubmitting(false);
     }
   };
@@ -65,7 +65,7 @@ export default function MerchantLoginPage() {
 
         <div className="absolute bottom-10 left-10 z-20 text-white drop-shadow-sm">
           <h2 className="font-serif text-2xl tracking-tight font-light">Vestira</h2>
-          <p className="font-sans text-xs tracking-widest uppercase opacity-80 mt-1">Merchant Console — Restricted Access</p>
+          <p className="font-sans text-xs tracking-widest uppercase opacity-80 mt-1">Seller Console — Restricted Access</p>
         </div>
       </div>
 
@@ -78,7 +78,7 @@ export default function MerchantLoginPage() {
             Vestira
           </Link>
           <span className="font-sans text-[9px] tracking-widest uppercase text-obsidian-velvet/30 border border-muted-zinc px-2 py-1 rounded">
-            Merchant Portal
+            Seller Portal
           </span>
         </div>
 
@@ -92,7 +92,7 @@ export default function MerchantLoginPage() {
           >
             <div className="mb-8">
               <h1 className="font-serif text-3xl font-light tracking-tight text-obsidian-velvet">
-                Merchant Sign In
+                Seller Sign In
               </h1>
               <p className="font-sans text-sm text-obsidian-velvet/60 mt-2">
                 Access the Vestira inventory and order management console.
@@ -105,7 +105,7 @@ export default function MerchantLoginPage() {
                   type="email"
                   disabled={isSubmitting}
                   error={!!errors.email}
-                  placeholder="merchant@vestira.ai"
+                  placeholder="seller@vestira.ai"
                   {...register("email")}
                 />
               </FormField>
@@ -134,13 +134,15 @@ export default function MerchantLoginPage() {
         </div>
 
         {/* Base Footnotes */}
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-muted-zinc/60 pt-6 text-center sm:flex-row text-xs font-sans text-obsidian-velvet/60">
+        <div className="flex flex-col items-center justify-center gap-4 border-t border-muted-zinc/60 pt-6 text-center text-xs font-sans text-obsidian-velvet/60">
           <span className="text-obsidian-velvet/40">
-            This portal is for authorized merchants only.
+            This portal is for authorized sellers only.
           </span>
+          {/* Seller registration is held/disabled
           <Link href="/seller/register" className="hover:underline hover:text-obsidian-velvet transition-colors font-semibold">
-            New merchant? Register here
+            New seller? Register here
           </Link>
+          */}
         </div>
       </div>
     </div>

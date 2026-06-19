@@ -1,5 +1,7 @@
 import React from "react";
 import { useBag } from "@/app/(customer)/BagContext";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 
 interface BagDrawerProps {
   isOpen: boolean;
@@ -110,6 +112,8 @@ export function BagDrawer({ isOpen, onClose, onCheckout }: BagDrawerProps) {
                           disabled={(item.quantity || 1) <= 1}
                           onClick={() => updateQuantity(item.id, item.size, -1)}
                           className="px-2 py-0.5 hover:bg-muted-zinc/20 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed text-obsidian-velvet/85 text-[10px] font-bold border-none transition-colors cursor-pointer"
+                          data-tooltip-id="bag-tooltip"
+                          data-tooltip-content="Decrease quantity"
                         >
                           -
                         </button>
@@ -118,8 +122,11 @@ export function BagDrawer({ isOpen, onClose, onCheckout }: BagDrawerProps) {
                         </span>
                         <button
                           type="button"
+                          disabled={(item.quantity || 1) >= (item.stockBySize?.[item.size] ?? 100)}
                           onClick={() => updateQuantity(item.id, item.size, 1)}
-                          className="px-2 py-0.5 hover:bg-muted-zinc/20 text-obsidian-velvet/85 text-[10px] font-bold border-none transition-colors cursor-pointer"
+                          className="px-2 py-0.5 hover:bg-muted-zinc/20 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed text-obsidian-velvet/85 text-[10px] font-bold border-none transition-colors cursor-pointer"
+                          data-tooltip-id="bag-tooltip"
+                          data-tooltip-content={(item.quantity || 1) >= (item.stockBySize?.[item.size] ?? 100) ? `Only ${item.stockBySize?.[item.size] ?? 100} units available in stock` : "Increase quantity"}
                         >
                           +
                         </button>
@@ -179,6 +186,7 @@ export function BagDrawer({ isOpen, onClose, onCheckout }: BagDrawerProps) {
           </div>
         </div>
       </div>
+      <Tooltip id="bag-tooltip" className="z-50" style={{ borderRadius: '6px', fontSize: '10px', padding: '6px 10px' }} />
     </>
   );
 }

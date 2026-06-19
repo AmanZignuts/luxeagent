@@ -268,6 +268,7 @@ export function ShowcasePanel({
                 onOpenSizes={openSizePickerForStagedItem}
                 onSwapItem={swapOutfitPiece}
                 swappingSku={swappingOutfitSku}
+                append={append}
               />
             </div>
           )}

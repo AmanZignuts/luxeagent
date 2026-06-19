@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { logoutAction } from "@/lib/actions/auth";
-import { BagProvider, useBag } from "@/app/(customer)/BagContext";
+import { useBag } from "@/app/(customer)/BagContext";
 import { createClient } from "@/lib/supabase/client";
 import {
   AuthModal,
@@ -21,11 +21,9 @@ export default function CustomerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <BagProvider>
-      <React.Suspense fallback={null}>
-        <CustomerLayoutContent>{children}</CustomerLayoutContent>
-      </React.Suspense>
-    </BagProvider>
+    <React.Suspense fallback={null}>
+      <CustomerLayoutContent>{children}</CustomerLayoutContent>
+    </React.Suspense>
   );
 }
 

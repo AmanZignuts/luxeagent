@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getMerchantOrders } from "@/lib/actions/orders";
-
+import { DashboardMetricCards } from "./components/DashboardMetricCards";
+import { DashboardRecentOrders } from "./components/DashboardRecentOrders";
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pending",
@@ -57,7 +57,7 @@ export default function SellerDashboardPage() {
         } = await supabase.auth.getUser();
         if (!user) return;
 
-        // ── Fetch orders via server action (bypasses RLS, same as orders page) ─
+        // ── Fetch orders via server action ─
         const orders = await getMerchantOrders();
 
         // ── Fetch seller's own products ─────────────────────────────────────
@@ -68,7 +68,6 @@ export default function SellerDashboardPage() {
 
         const dbOrders = orders || [];
         const dbProducts = products || [];
-
 
         // Revenue
         const revenue = dbOrders
@@ -199,37 +198,6 @@ export default function SellerDashboardPage() {
     load();
   }, []);
 
-  const metrics = [
-    {
-      label: "Total Revenue",
-      value: loading ? "—" : totalRevenue,
-      sub: "All non-cancelled orders",
-      dot: "bg-emerald-500",
-      dotText: "text-emerald-600",
-    },
-    {
-      label: "Active Orders",
-      value: loading ? "—" : activeOrdersCount,
-      sub: loading ? "—" : pendingCount,
-      dot: "bg-sky-500",
-      dotText: "text-sky-600",
-    },
-    {
-      label: "Catalogue Size",
-      value: loading ? "—" : catalogueSize,
-      sub: "Active listings",
-      dot: "bg-violet-500",
-      dotText: "text-violet-600",
-    },
-    {
-      label: "Embedding Coverage",
-      value: loading ? "—" : embeddingAccuracy,
-      sub: "Products with AI vectors",
-      dot: "bg-amber-500",
-      dotText: "text-amber-600",
-    },
-  ];
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-3xl mx-auto py-12 animate-in fade-in duration-300">
@@ -261,31 +229,17 @@ export default function SellerDashboardPage() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {metrics.map((m, i) => (
-          <div
-            key={i}
-            className="bg-surface-white border border-muted-zinc rounded-xl p-6 space-y-2 shadow-none"
-          >
-            <span className="font-sans text-[10px] font-bold tracking-widest uppercase text-obsidian-velvet/40 block">
-              {m.label}
-            </span>
-            <p className="font-sans text-2xl font-semibold text-obsidian-velvet">
-              {m.value}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${m.dot}`} />
-              <span className={`font-sans text-[9px] font-semibold uppercase tracking-wider ${m.dotText}`}>
-                {m.sub}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DashboardMetricCards
+        loading={loading}
+        totalRevenue={totalRevenue}
+        activeOrdersCount={activeOrdersCount}
+        pendingCount={pendingCount}
+        catalogueSize={catalogueSize}
+        embeddingAccuracy={embeddingAccuracy}
+      />
 
       {/* Chart + Queue */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-
         {/* Revenue Chart */}
         <div className="lg:col-span-7 bg-surface-white border border-muted-zinc rounded-xl p-8 shadow-none flex flex-col gap-6">
           <div className="border-b border-muted-zinc/60 pb-4 flex justify-between items-center">
@@ -378,83 +332,12 @@ export default function SellerDashboardPage() {
         </div>
 
         {/* Active Orders Queue */}
-        <div className="lg:col-span-5 bg-surface-white border border-muted-zinc rounded-xl p-8 shadow-none flex flex-col justify-between min-h-[380px]">
-          <div className="space-y-4 flex-1">
-            <div className="border-b border-muted-zinc/60 pb-4">
-              <span className="font-sans text-[9px] tracking-widest uppercase text-obsidian-velvet/40 block mb-0.5">
-                Order Queue
-              </span>
-              <h3 className="font-serif text-xl font-light tracking-tight text-obsidian-velvet">
-                Active Orders
-              </h3>
-            </div>
-
-            <div className="relative">
-              <div className="space-y-3 text-xs font-sans max-h-[215px] overflow-y-auto pr-2 pb-6">
-                {loading ? (
-                  <div className="flex items-center gap-3 py-8 justify-center">
-                    <div className="w-4 h-4 rounded-full border border-muted-zinc border-t-obsidian-velvet animate-spin" />
-                    <span className="text-obsidian-velvet/40 text-[11px]">Loading orders...</span>
-                  </div>
-                ) : activeOrders.length === 0 ? (
-                  <div className="border border-dashed border-muted-zinc/60 rounded-xl p-10 text-center">
-                    <p className="font-sans text-[11px] text-obsidian-velvet/40 font-semibold uppercase tracking-wider">
-                      No active orders
-                    </p>
-                    <p className="font-sans text-[10px] text-obsidian-velvet/30 mt-1">
-                      Orders will appear here once placed
-                    </p>
-                  </div>
-                ) : (
-                  activeOrders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="border border-muted-zinc/60 rounded-xl p-4 hover:border-obsidian-velvet/30 transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-0.5 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-serif text-xs font-medium text-obsidian-velvet">
-                              {order.id}
-                            </span>
-                            <span
-                              className={`border px-2 py-0.5 rounded-sm text-[8px] font-bold uppercase tracking-wider ${STATUS_STYLE[order.status] ?? "text-zinc-500 bg-zinc-50 border-zinc-200"}`}
-                            >
-                              {STATUS_LABELS[order.status] ?? order.status}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-obsidian-velvet/50 truncate">
-                            {order.client} · {order.summary}
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-sans text-xs font-semibold text-obsidian-velvet">
-                            ${order.total.toFixed(2)}
-                          </p>
-                          <p className="font-sans text-[9px] text-obsidian-velvet/40 mt-0.5">
-                            {order.date}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-surface-white to-transparent pointer-events-none" />
-            </div>
-          </div>
-
-          <div className="pt-4">
-            <Link
-              href="/seller/orders"
-              className="w-full bg-obsidian-velvet text-surface-white font-sans font-semibold text-[10px] uppercase tracking-wider rounded-md py-3 hover:bg-obsidian-velvet/90 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5"
-            >
-              <span>View All Orders</span>
-              <span>→</span>
-            </Link>
-          </div>
-        </div>
-
+        <DashboardRecentOrders
+          loading={loading}
+          activeOrders={activeOrders}
+          statusLabels={STATUS_LABELS}
+          statusStyle={STATUS_STYLE}
+        />
       </div>
     </div>
   );

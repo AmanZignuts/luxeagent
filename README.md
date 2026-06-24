@@ -204,5 +204,5 @@ You can execute workspace commands directly from the root directory:
 ## 🎨 Architecture Specifications
 
 For granular details regarding typography, custom CSS color variables (e.g., Linen `#FAF0E6` vs Obsidian `#09090B`), spacing guidelines, and RSC boundary configurations, consult:
-* **[PROJECT_ANTIGRAVITY_SPEC.md](./PROJECT_ANTIGRAVITY_SPEC.md)** - System Architecture and Design Contract
+* **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System Architecture and Design Contract
 * **[supabase/migrations/](./supabase/migrations/)** - SQL source files detailing the database schema and RLS policies

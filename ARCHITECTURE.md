@@ -34,7 +34,10 @@ Vestira Concierge is an agentic luxury fashion concierge ecosystem split into tw
 ├── 📁 (ai)/                                    # Layout Beta: Immersive Chat Stage
 │   └── 📁 concierge/page.tsx                   # Screen 6: Full 100vh Split Chat Canvas
 │
-└── 📁 (seller)/                                # Layout Gamma: 260px Fixed Sidebar Ecosystem
+├── 📁 landing/                                 # Public Landing Route (Direct)
+│   └── 📁 page.tsx                             # Editorial Brand Entry Page
+│
+└── 📁 seller/                                  # Layout Gamma: 260px Fixed Sidebar Ecosystem
     ├── 📁 dashboard/page.tsx                   # Screen 11: Boutique Performance Ledger
     ├── 📁 inventory/page.tsx                   # Screen 12: Data Grid Catalog Sku Table
     ├── 📁 ingestion/page.tsx                   # Screen 13: Vision AI Media Processing Ingestion
@@ -72,7 +75,7 @@ Typographic rhythm defines the editorial presence of Vestira Concierge. Code mus
 
 ### 🎭 Font Role Allocation
 1. **Editorial Headers (`font-serif`):** Implements *Playfair Display* or *Didot* configurations. Must always be styled with tight character spacing (`tracking-tight`) and light/medium weights. Use exclusively for page-level headers, major section headers, product names, and transaction totals.
-2. **Operational UI (`font-sans`):** Implements *Inter* or *Helvetica Neue* styles. Always set with standard text tracking. Applied across form labels, buttons, search input values, database rows, table metadata metrics, and data numbers.
+2. **Operational UI (`font-sans`):** Implements *Geist* or *Inter* styles. Always set with standard text tracking. Applied across form labels, buttons, search input values, database rows, table metadata metrics, and data numbers.
 
 ### 📊 Code Typography Mapping Template
 ```tsx
@@ -106,12 +109,12 @@ The Antigravity Framework implements three structural shell profiles to manage v
 ### 🔲 Layout Beta — Immersive AI Workspace Shell
 - **Routes:** `app/(ai)/concierge/page.tsx`
 - **Shell Layout:** Completely structural, forcing full layout height constraints (`h-screen w-screen overflow-hidden bg-[#FAF0E6]`). Customer headers, navigation tracks, and floating buttons are programmatically omitted.
-- **Grid Splits:** Grid is strictly broken into an asymmetrical 35% fixed chat log column (left) and an independent 65% generative styling staging canvas workspace area (right).
+- **Grid Splits:** On desktop, the layout splits into a fixed-width chat log column on the left (`w-[480px]` to `w-[520px]`) and a fluid styling staging canvas workspace area (`flex-1`) on the right. On mobile and tablet, the staging workspace is presented via a contextual drawer overlay.
 
 ### 📐 Layout Gamma — Seller Operational Workspace Shell
-- **Routes:** `app/(seller)/**/*`
+- **Routes:** `app/seller/**/*`
 - **Shell Layout:** Structural operational view layout featuring a persistent 260px wide static left-side panel container (`w-[260px] h-screen fixed left-0 top-0 bg-white border-r border-[#E4E4E7]`). Customer layouts and consumer assistant popups are stripped out.
-- **Main Workspace Canvas:** The remainder of the screen space utilizes `pl-[260px] bg-[#FAF0E6] min-h-screen` to display high-density management tables, analytical metrics, or asset pipeline processing fields.
+- **Main Workspace Canvas:** The remainder of the screen space utilizes `pl-[260px] bg-[#FAF0E6] min-h-screen` (with responsive header and sidebar toggles for mobile viewports) to display high-density management tables, analytical metrics, or asset pipeline processing fields.
 
 ---
 
@@ -130,8 +133,12 @@ When converting active Stitch frames into executable Next.js 15 / React Server C
 ### 🔍 Rule 5.3: Type Definition Enforcements
 Every layout item, order vector data row, or style preference record must pass strict TypeScript definitions. No `any` type escapes are allowed in the runtime environment.
 
+The core database schemas are defined in [types.ts](file:///Users/amantiwari/Desktop/project/luxeagent/apps/web/lib/supabase/types.ts), and UI-specific components follow structured models like `Product` and `StagedLookItem` in [components/types.ts](file:///Users/amantiwari/Desktop/project/luxeagent/apps/web/features/concierge/components/types.ts).
+
+Below are illustrative type interface contracts showing the level of strictness required:
+
 ```typescript
-// Core Data Contracts
+// Illustrative Type Interface Examples
 export interface ProductItem {
   id: string;
   sku: string;

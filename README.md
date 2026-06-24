@@ -154,7 +154,6 @@ The system supports the following environment variables inside `.env.local`:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | - | Public API key for client-side queries (enforces RLS) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | - | Secret admin key used only for backend ingestion and seeding scripts |
 | `GEMINI_API_KEY` | Yes | - | API key for Google Gemini model generation and embedding functions |
-| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | The public base URL of the client application |
 
 ---
 

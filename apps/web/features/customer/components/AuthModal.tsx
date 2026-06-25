@@ -97,7 +97,12 @@ export function AuthModal({
         onSuccess?.();
         toast.success("Welcome to Vestira! Account registered successfully.");
         router.refresh();
-        router.push("/onboarding/style-persona");
+
+        if (pendingAction) {
+          setTimeout(() => {
+            pendingAction();
+          }, 200);
+        }
       }
     } catch (err: any) {
       toast.error(

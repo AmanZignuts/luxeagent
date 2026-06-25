@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { logoutAction } from "@/lib/actions/auth";
 import { SignOutModal } from "@/features/customer/components/SignOutModal";
@@ -20,6 +20,7 @@ export default function SellerLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -34,6 +35,7 @@ export default function SellerLayout({
       setIsSigningOut(true);
       toast.success("Successfully signed out. Hope to see you soon.");
       await logoutAction('/seller/login');
+      router.push('/seller/login');
     } finally {
       // No need to set false usually if it redirects, but good practice
       setIsSigningOut(false);

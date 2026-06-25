@@ -122,6 +122,18 @@ function CustomerLayoutContent({ children }: { children: React.ReactNode }) {
     setShowSignOutModal(false);
     toast.success("Successfully signed out. Hope to see you soon.");
     await logoutAction();
+
+    const isProtected =
+      pathname.startsWith("/checkout") ||
+      pathname.startsWith("/profile") ||
+      pathname.startsWith("/orders") ||
+      pathname.startsWith("/concierge");
+
+    if (isProtected) {
+      router.push("/login");
+    } else {
+      router.refresh();
+    }
   };
 
   const handleCheckoutNavigation = () => {

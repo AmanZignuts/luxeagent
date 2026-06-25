@@ -261,10 +261,14 @@ export default function ShopperSetupPage() {
                 </FormField>
                 <FormField label="Phone Number" error={errors.phone?.message}>
                   <Input
-                    type="text"
+                    type="tel"
                     disabled={isSubmitting}
                     error={!!errors.phone}
-                    {...register("phone")}
+                    {...register("phone", {
+                      onChange: (e) => {
+                        e.target.value = e.target.value.replace(/[^0-9+\s\-()]/g, "");
+                      }
+                    })}
                   />
                 </FormField>
               </div>

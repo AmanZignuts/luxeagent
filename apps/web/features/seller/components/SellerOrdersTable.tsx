@@ -27,6 +27,21 @@ export function SellerOrdersTable({
   advanceOrderStatus,
   getStatusBadge,
 }: SellerOrdersTableProps) {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const pageSize = 10; // Number of items per page
+
+  // Reset to page 1 whenever search term or filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeStatusFilter]);
+
+  const totalOrders = filteredOrders.length;
+  const totalPages = Math.ceil(totalOrders / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedOrders = filteredOrders.slice(startIndex, startIndex + pageSize);
+  const startDisplay = totalOrders === 0 ? 0 : startIndex + 1;
+  const endDisplay = Math.min(startIndex + pageSize, totalOrders);
+
   return (
     <div className="space-y-10 animate-in fade-in duration-300 w-full">
       {/* Page Header */}
@@ -86,14 +101,14 @@ export function SellerOrdersTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-muted-zinc/60 text-obsidian-velvet">
-              {filteredOrders.length === 0 ? (
+              {paginatedOrders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-obsidian-velvet/40">
                     No active orders match your search or filters.
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr
                     key={order.id}
                     onClick={() => setSelectedOrderId(order.id)}
@@ -163,6 +178,36 @@ export function SellerOrdersTable({
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Console */}
+        {totalOrders > 0 && (
+          <div className="border-t border-muted-zinc/60 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-zinc-50/30">
+            <div className="font-sans text-[10px] font-bold text-obsidian-velvet/50 uppercase tracking-widest">
+              Showing {startDisplay} to {endDisplay} of {totalOrders} orders
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                className="px-3.5 py-2 border border-muted-zinc hover:border-obsidian-velvet/60 text-obsidian-velvet font-sans font-bold text-[9px] uppercase tracking-wider rounded-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-surface-white select-none"
+              >
+                Previous
+              </button>
+              <span className="font-sans text-[10px] font-bold text-obsidian-velvet/50 uppercase tracking-widest select-none">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                className="px-3.5 py-2 border border-muted-zinc hover:border-obsidian-velvet/60 text-obsidian-velvet font-sans font-bold text-[9px] uppercase tracking-wider rounded-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-surface-white select-none"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <Tooltip id="table-tooltip" className="z-50" style={{ maxWidth: '300px', whiteSpace: 'normal', borderRadius: '6px', fontSize: '12px' }} />
     </div>

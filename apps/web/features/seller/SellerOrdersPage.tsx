@@ -96,7 +96,7 @@ export default function SellerOrdersPage() {
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || "Failed to load orders from Supabase.");
+      toast.error(e.message || "Failed to load orders.");
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ export default function SellerOrdersPage() {
       fetchOrders();
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || "Failed to update order status in Supabase.");
+      toast.error(e.message || "Failed to update order status.");
     }
   };
 

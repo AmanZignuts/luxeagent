@@ -231,7 +231,16 @@ export default function ProfileSettingsPage() {
                 <Input type="email" disabled={true} error={!!personalForm.formState.errors.email} {...personalForm.register("email")} />
               </FormField>
               <FormField label="Phone Number" error={personalForm.formState.errors.phone?.message}>
-                <Input type="text" disabled={isUpdatingProfile} error={!!personalForm.formState.errors.phone} {...personalForm.register("phone")} />
+                <Input
+                  type="tel"
+                  disabled={isUpdatingProfile}
+                  error={!!personalForm.formState.errors.phone}
+                  {...personalForm.register("phone", {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/[^0-9+\s\-()]/g, "");
+                    }
+                  })}
+                />
               </FormField>
             </div>
             <FormField label="Default Shipping Address" error={personalForm.formState.errors.address?.message}>

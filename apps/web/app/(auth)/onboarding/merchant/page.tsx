@@ -117,7 +117,11 @@ export default function MerchantOnboardingPage() {
                 disabled={isSubmitting}
                 error={!!errors.phone}
                 placeholder="+1 (555) 000-0000"
-                {...register("phone")}
+                {...register("phone", {
+                  onChange: (e) => {
+                    e.target.value = e.target.value.replace(/[^0-9+\s\-()]/g, "");
+                  }
+                })}
               />
             </FormField>
             

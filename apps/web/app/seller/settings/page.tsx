@@ -106,7 +106,7 @@ export default function SellerSettingsPage() {
           }
         }
       } catch (err) {
-        console.error("Failed to load settings from Supabase", err);
+        console.error("Failed to load settings", err);
       } finally {
         setLoading(false);
         setTimeout(() => {
@@ -182,7 +182,7 @@ export default function SellerSettingsPage() {
               Loading Store Calibrations
             </h3>
             <p className="font-sans text-[10px] text-obsidian-velvet/40 tracking-wider uppercase font-semibold">
-              Syncing business parameters from Supabase
+              Syncing business parameters
             </p>
           </div>
         </div>
@@ -249,7 +249,11 @@ export default function SellerSettingsPage() {
                   type="tel"
                   disabled={isUpdating}
                   error={!!errors.storePhone}
-                  {...register("storePhone")}
+                  {...register("storePhone", {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/[^0-9+\s\-()]/g, "");
+                    }
+                  })}
                 />
               </FormField>
 

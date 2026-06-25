@@ -2,7 +2,7 @@
 
 **AI-Enhanced E-Commerce Platform & Agentic Fashion Concierge**
 
-Welcome to **Vestira**, a high-end luxury fashion e-commerce platform built with **Next.js 15**, the **Vercel AI SDK**, and **Supabase**. 
+Welcome to **Vestira**, a high-end luxury fashion e-commerce platform built with **Next.js 16 (Canary)**, the **Vercel AI SDK**, and **Supabase**. 
 
 At the center of Vestira is **Vestira Concierge**—an autonomous AI stylist concierge designed for premium commerce. Vestira Concierge understands natural language requests, uploads and analyzes reference images, executes tools against live database catalogs using hybrid search, and streams interactive **Generative UI** widgets (like outfit builders, size pickers, and product carousels) directly into the customer's chat.
 
@@ -39,7 +39,7 @@ At the center of Vestira is **Vestira Concierge**—an autonomous AI stylist con
 
 | Layer | Technology | Description |
 |---|---|---|
-| **Framework** | [Next.js 15](https://nextjs.org/) (App Router, React 19) | Main web application framework |
+| **Framework** | [Next.js 16 (Canary)](https://nextjs.org/) (App Router, React 19) | Main web application framework |
 | **AI SDK** | [Vercel AI SDK](https://sdk.vercel.ai/) v6, `@ai-sdk/google` | Multi-step agent orchestrator and React UI streams |
 | **LLM & Vision** | Google Gemini 2.0 / 1.5 | Model used for chat, vision tagging, and metadata extraction |
 | **Embeddings** | `text-embedding-004` (or `gemini-embedding-2`) | 768-dimensional textual and vision caption embeddings |
@@ -56,7 +56,7 @@ The codebase is organized as an **npm monorepo** workspace to logically isolate 
 
 ```text
 ├── apps/
-│   └── web/                # The main Next.js 15 application (pages, components, API routes)
+│   └── web/                # The main Next.js 16 application (pages, components, API routes)
 │       ├── app/            # App Router routes (concierge, shop, seller dashboards, auth)
 │       ├── components/     # Reusable layout and theme elements
 │       ├── features/       # Feature-specific components (concierge, outfit-builder, checkout)
@@ -167,11 +167,18 @@ The consumer and merchant platforms are divided into separate layout routes:
 | **`/shop`** | Public | Grid feed showcasing active product inventory |
 | **`/pdp/[itemId]`** | Public | Product details page with AI-powered lookbook suggest |
 | **`/concierge`** | Customer (Auth) | Immersive full-screen Vestira Concierge chat canvas & Generative UI |
-| **`/login` / `/register`** | Public | Authentication endpoints |
+| **`/login` / `/register`** | Public | Customer authentication endpoints |
 | **`/onboarding/style-persona`**| Customer (Auth) | Style onboarding questionnaire to calibrate user profiles |
-| **`/seller/dashboard`** | Merchant (Auth) | Product ingestion pipeline and store metrics |
-| **`/seller/inventory`** | Merchant (Auth) | Raw catalog data grids |
-| **`/seller/ingestion`** | Merchant (Auth) | Vision-AI media processing engine for new catalog items |
+| **`/checkout`** | Customer (Auth) | Editorial Express Checkout Matrix |
+| **`/profile`** | Customer (Auth) | Customer profile configurations |
+| **`/orders`** | Customer (Auth) | Historical purchase dossier and order details |
+| **`/orders/confirmation`** | Customer (Auth) | Order success confirmation & tailor AI banner |
+| **`/seller/login` / `/seller/register`** | Public | Merchant-specific authentication endpoints |
+| **`/seller/dashboard`** | Merchant (Auth) | Store performance ledger and analytics |
+| **`/seller/inventory`** | Merchant (Auth) | Raw catalog data grids and SKU table |
+| **`/seller/ingestion`** | Merchant (Auth) | Vision-AI media processing and product ingestion pipeline |
+| **`/seller/orders`** | Merchant (Auth) | Merchant order fulfillment queue |
+| **`/seller/settings`** | Merchant (Auth) | Storefront API integration dashboard |
 
 ---
 

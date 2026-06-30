@@ -97,7 +97,15 @@ export default async function CatalogPage({ searchParams }: PageProps) {
 
   let products: MappedProduct[] = [];
 
+  // Normalize size variants — "OS" and "ONE SIZE" (any casing) → canonical "ONE SIZE"
+  const normalizeSize = (sz: string): string => {
+    const upper = sz.trim().toUpperCase();
+    if (upper === "OS" || upper === "ONE SIZE" || upper === "ONESIZE") return "ONE SIZE";
+    return sz.trim();
+  };
+
   if (!error && data && data.length > 0) {
+
     products = data
       .map((p) => {
         const stockMap = p.stock_by_size as Record<string, number> | null;
@@ -136,7 +144,7 @@ export default async function CatalogPage({ searchParams }: PageProps) {
               ? p.image_urls[0]
               : "/product_overshirt.png",
           inStock: totalStock > 0,
-          sizes: Array.isArray(p.sizes) ? p.sizes : ["M"],
+          sizes: Array.isArray(p.sizes) ? [...new Set(p.sizes.map(normalizeSize))] : ["M"],
           gender: p.gender ?? undefined,
           tags: Array.isArray(p.tags) ? p.tags : [],
           description: p.description ?? "",
@@ -149,8 +157,8 @@ export default async function CatalogPage({ searchParams }: PageProps) {
         if (searchTerms.length > 0 && p.searchScore === 0) return false;
         // Category filter
         if (cats.length > 0 && !cats.includes(p.rawCategory)) return false;
-        // Size filter
-        if (sizes.length > 0 && !p.sizes.some((sz) => sizes.includes(sz))) return false;
+        // Size filter (case-insensitive)
+        if (sizes.length > 0 && !p.sizes.some((sz) => sizes.some((fs) => fs.toUpperCase() === sz.toUpperCase()))) return false;
         // In-stock filter
         if (inStockOnly && !p.inStock) return false;
         return true;
@@ -175,11 +183,13 @@ export default async function CatalogPage({ searchParams }: PageProps) {
   const allSizes: string[] = data
     ? Array.from(
         new Set(
-          data.flatMap((p) => (Array.isArray(p.sizes) ? p.sizes : []))
+          data.flatMap((p) => (Array.isArray(p.sizes) ? p.sizes.map(normalizeSize) : []))
         )
       ).sort((a: string, b: string) => {
         const order = ["XS", "S", "M", "L", "XL", "XXL", "ONE SIZE"];
-        return order.indexOf(a) - order.indexOf(b);
+        const ai = order.indexOf(a);
+        const bi = order.indexOf(b);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
       })
     : ["XS", "S", "M", "L", "XL", "XXL"];
 

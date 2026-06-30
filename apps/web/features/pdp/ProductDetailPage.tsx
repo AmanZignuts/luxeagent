@@ -71,7 +71,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const itemId = params.itemId as string;
 
-  const { bagItems, addToBag, setIsBagDrawerOpen } = useBag();
+  const { bagItems, addToBag, removeFromBag, updateQuantity, setIsBagDrawerOpen } = useBag();
   const router = useRouter();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,9 +100,11 @@ export default function ProductDetailPage() {
     };
   }, []);
 
-  const isAlreadyInBag = product
-    ? bagItems.some((item) => item.id === product.id && item.size === activeSize)
-    : false;
+  const bagItem = product
+    ? bagItems.find((item) => item.id === product.id && item.size === activeSize)
+    : undefined;
+  const isAlreadyInBag = !!bagItem;
+  const bagItemQty = Number(bagItem?.quantity) || 0;
 
   useEffect(() => {
     async function loadProductDetail() {
@@ -225,13 +227,6 @@ export default function ProductDetailPage() {
     }, 800);
   };
 
-  const handleButtonClick = () => {
-    if (isAlreadyInBag) {
-      setIsBagDrawerOpen(true);
-    } else {
-      handleAdd();
-    }
-  };
 
   const handleBuyNow = () => {
     if (!product) return;
@@ -333,34 +328,95 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Add to Bag and Buy Now Buttons */}
+          {/* Add to Bag / Quantity Counter / Buy Now */}
           <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={handleButtonClick}
-              disabled={isAdding || (isOutOfStock && !isAlreadyInBag)}
-              className={`flex-1 font-sans font-semibold text-xs uppercase tracking-wider rounded-md py-3.5 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3 shadow-none ${
-                isAlreadyInBag
-                  ? "border border-obsidian-velvet bg-transparent text-obsidian-velvet hover:bg-obsidian-velvet/5"
-                  : isOutOfStock
-                  ? "bg-muted-zinc/40 text-obsidian-velvet/30 cursor-not-allowed border-none"
-                  : "bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90"
-              }`}
-            >
-              {isAdding ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-t border-r border-surface-white animate-spin" />
-                  <span>Adding...</span>
-                </>
-              ) : isAlreadyInBag ? (
-                <span>View Bag</span>
-              ) : isOutOfStock ? (
-                <span>Out of Stock</span>
-              ) : (
-                <span>Add to Bag</span>
-              )}
-            </button>
-            
+            {isAlreadyInBag ? (
+              /* ── Quantity Counter ─────────────────────────────────────── */
+              <div className="flex-1 flex items-center gap-3">
+                {/* Stepper pill */}
+                <div className="flex items-center border border-obsidian-velvet rounded-md overflow-hidden h-[46px] bg-surface-white">
+                  {/* Decrease / Delete button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!product) return;
+                      if (bagItemQty <= 1) {
+                        removeFromBag(product.id, activeSize);
+                      } else {
+                        updateQuantity(product.id, activeSize, -1);
+                      }
+                    }}
+                    className="w-11 h-full flex items-center justify-center text-obsidian-velvet hover:bg-obsidian-velvet/5 transition-colors cursor-pointer border-r border-obsidian-velvet/20"
+                    title={bagItemQty <= 1 ? "Remove from bag" : "Decrease quantity"}
+                  >
+                    {bagItemQty <= 1 ? (
+                      /* Trash icon */
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
+                    ) : (
+                      /* Minus icon */
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* Quantity display */}
+                  <span className="w-10 text-center font-sans text-sm font-semibold text-obsidian-velvet select-none">
+                    {bagItemQty}
+                  </span>
+
+                  {/* Increase button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!product) return;
+                      updateQuantity(product.id, activeSize, 1);
+                    }}
+                    className="w-11 h-full flex items-center justify-center text-obsidian-velvet hover:bg-obsidian-velvet/5 transition-colors cursor-pointer border-l border-obsidian-velvet/20"
+                    title="Increase quantity"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* View Bag shortcut */}
+                <button
+                  type="button"
+                  onClick={() => setIsBagDrawerOpen(true)}
+                  className="flex-1 border border-obsidian-velvet bg-transparent text-obsidian-velvet hover:bg-obsidian-velvet/5 font-sans font-semibold text-xs uppercase tracking-wider rounded-md py-3.5 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer h-[46px]"
+                >
+                  <span>View Bag</span>
+                </button>
+              </div>
+            ) : (
+              /* ── Add to Bag Button ────────────────────────────────────── */
+              <button
+                type="button"
+                onClick={handleAdd}
+                disabled={isAdding || isOutOfStock}
+                className={`flex-1 font-sans font-semibold text-xs uppercase tracking-wider rounded-md py-3.5 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3 shadow-none ${
+                  isOutOfStock
+                    ? "bg-muted-zinc/40 text-obsidian-velvet/30 cursor-not-allowed border-none"
+                    : "bg-obsidian-velvet text-surface-white hover:bg-obsidian-velvet/90"
+                }`}
+              >
+                {isAdding ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-t border-r border-surface-white animate-spin" />
+                    <span>Adding...</span>
+                  </>
+                ) : isOutOfStock ? (
+                  <span>Out of Stock</span>
+                ) : (
+                  <span>Add to Bag</span>
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleBuyNow}

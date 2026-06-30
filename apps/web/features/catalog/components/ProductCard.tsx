@@ -32,11 +32,7 @@ export const ProductCard = React.memo(({ product }: { product: CatalogProduct })
               <span className="bg-red-50 border border-red-200 text-red-700 px-1.5 py-0.5 rounded-sm text-[8px] font-sans font-bold uppercase tracking-wider shrink-0">
                 Out of Stock
               </span>
-            ) : (
-              <span className="text-[10px] text-amber-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline shrink-0">
-                ✦ Calibrated Fit
-              </span>
-            )}
+            ) : null}
           </div>
           <h3 className="font-serif text-sm sm:text-base font-semibold text-obsidian-velvet truncate w-full" title={product.title}>
             {product.title}
